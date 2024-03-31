@@ -83,6 +83,8 @@ def main():
     else:
         player = mobs.Mob((0, 0), "@")
         mob_objects.add(player)
+    # Key events.
+    w = s = a = d = False
 
     while True:
         for event in pg.event.get():
@@ -93,20 +95,57 @@ def main():
                 if event.key == pg.K_ESCAPE:
                     pg.quit()
                     sys.exit()
+                elif event.key == pg.K_w:
+                    w = True
+                elif event.key == pg.K_s:
+                    s = True
+                elif event.key == pg.K_a:
+                    a = True
+                elif event.key == pg.K_d:
+                    d = True
+            elif event.type == pg.KEYUP:
+                if event.key == pg.K_w:
+                    w = False
+                elif event.key == pg.K_s:
+                    s = False
+                elif event.key == pg.K_a:
+                    a = False
+                elif event.key == pg.K_d:
+                    d = False
 
         # Update stuff.
         dt = clock.tick() / 1000.0
 
         # Move player.
-        pressed = pg.key.get_pressed()
-        if pressed[pg.K_w]:
-            player.pos.y -= PLAYER_SPEED * dt
-        if pressed[pg.K_s]:
-            player.pos.y += PLAYER_SPEED * dt
-        if pressed[pg.K_a]:
-            player.pos.x -= PLAYER_SPEED * dt
-        if pressed[pg.K_d]:
-            player.pos.x += PLAYER_SPEED * dt
+        moving_vertical = w ^ s
+        moving_horizontal = a ^ d
+        amount = PLAYER_SPEED * dt * (0.707 if moving_horizontal and moving_vertical else 1)
+        if moving_vertical:
+            if w:
+                player.pos.y -= amount
+                if hit := pg.sprite.spritecollideany(player, tile_objects):
+                    # player.pos.y += amount
+                    player.rect.top = hit.rect.bottom + 1
+                    player.pos = pg.Vector2(player.rect.topleft)
+            if s:
+                player.pos.y += amount
+                if hit := pg.sprite.spritecollideany(player, tile_objects):
+                    # player.pos.y -= amount
+                    player.rect.bottom = hit.rect.top - 1
+                    player.pos = pg.Vector2(player.rect.topleft)
+        if moving_horizontal:
+            if a:
+                player.pos.x -= amount
+                if hit := pg.sprite.spritecollideany(player, tile_objects):
+                    # player.pos.x += amount
+                    player.rect.left = hit.rect.right + 1
+                    player.pos = pg.Vector2(player.rect.topleft)
+            if d:
+                player.pos.x += amount
+                if hit := pg.sprite.spritecollideany(player, tile_objects):
+                    # player.pos.x -= amount
+                    player.rect.right = hit.rect.left - 1
+                    player.pos = pg.Vector2(player.rect.topleft)
 
         # Update all the mobs.
         mob_objects.update()
