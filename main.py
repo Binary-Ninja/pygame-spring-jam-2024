@@ -22,6 +22,13 @@ def get_screen(size: tuple[int, int], full_screen: bool = True) -> pg.Surface:
     return pg.display.set_mode(size, pg.FULLSCREEN if full_screen else 0)
 
 
+def get_font(font_path: Path, size: int) -> pg.font.Font:
+    if font_path.exists():
+        return pg.font.Font(font_path, size)
+    else:
+        return pg.font.Font(None, size)
+
+
 def int_vec(vec: pg.Vector2) -> tuple[int, int]:
     return int(vec.x), int(vec.y)
 
@@ -57,11 +64,10 @@ def load_map(map_str: str) -> tuple[pg.sprite.Group, pg.sprite.Group]:
 def find_player(mob_objects: pg.sprite.Group) -> mobs.Mob:
     for mob in mob_objects:
         if mob.id is mobs.MobID.PLAYER:
+            mob_objects.remove(mob)
             return mob
     else:
-        p = mobs.Mob((0, 0), "@")
-        mob_objects.add(p)
-        return p
+        return mobs.Mob(images.TILE_SIZE, "@")
 
 
 def main():
@@ -78,10 +84,8 @@ def main():
     # Set up useful objects.
     clock = pg.time.Clock()
     font_path = Path() / "Kenney Future.ttf"
-    if font_path.exists():
-        font = pg.font.Font(font_path, 12)
-    else:
-        font = pg.font.Font(None, 12)
+    font12 = get_font(font_path, 12)
+    font24 = get_font(font_path, 24)
     # Make the images.
     images.make_images()
     # Set up game world.
@@ -100,28 +104,35 @@ def main():
                 if event.key == pg.K_ESCAPE:
                     pg.quit()
                     sys.exit()
-                elif event.key == pg.K_w:
+                elif event.key == pg.K_F5:
+                    full_screen = not full_screen
+                    screen = get_screen(SCREEN_SIZE, full_screen)
+                elif event.key == pg.K_KP_PLUS:
+                    player.heat = min(player.max_heat, player.heat + 1)
+                elif event.key == pg.K_KP_MINUS:
+                    player.heat = max(0, player.heat - 1)
+                elif event.key == pg.K_w or event.key == pg.K_UP:
                     w = True
-                elif event.key == pg.K_s:
+                elif event.key == pg.K_s or event.key == pg.K_DOWN:
                     s = True
-                elif event.key == pg.K_a:
+                elif event.key == pg.K_a or event.key == pg.K_LEFT:
                     a = True
-                elif event.key == pg.K_d:
+                elif event.key == pg.K_d or event.key == pg.K_RIGHT:
                     d = True
             elif event.type == pg.KEYUP:
-                if event.key == pg.K_w:
+                if event.key == pg.K_w or event.key == pg.K_UP:
                     w = False
-                elif event.key == pg.K_s:
+                elif event.key == pg.K_s or event.key == pg.K_DOWN:
                     s = False
-                elif event.key == pg.K_a:
+                elif event.key == pg.K_a or event.key == pg.K_LEFT:
                     a = False
-                elif event.key == pg.K_d:
+                elif event.key == pg.K_d or event.key == pg.K_RIGHT:
                     d = False
 
         # Update stuff.
         dt = clock.tick() / 1000.0
 
-        # Move player.
+        # Move player and do collisions.
         moving_vertical = w ^ s
         moving_horizontal = a ^ d
         amount = PLAYER_SPEED * dt * (0.707 if moving_horizontal and moving_vertical else 1)
@@ -130,14 +141,18 @@ def main():
                 player.pos.y -= amount
                 player.update()
                 if hit := pg.sprite.spritecollideany(player, tile_objects):
-                    # player.pos.y += amount
+                    player.rect.top = hit.rect.bottom
+                    player.pos.y = hit.rect.bottom
+                if hit := pg.sprite.spritecollideany(player, mob_objects):
                     player.rect.top = hit.rect.bottom
                     player.pos.y = hit.rect.bottom
             if s:
                 player.pos.y += amount
                 player.update()
                 if hit := pg.sprite.spritecollideany(player, tile_objects):
-                    # player.pos.y -= amount
+                    player.rect.bottom = hit.rect.top
+                    player.pos.y = hit.rect.top - player.rect.height
+                if hit := pg.sprite.spritecollideany(player, mob_objects):
                     player.rect.bottom = hit.rect.top
                     player.pos.y = hit.rect.top - player.rect.height
         if moving_horizontal:
@@ -145,18 +160,23 @@ def main():
                 player.pos.x -= amount
                 player.update()
                 if hit := pg.sprite.spritecollideany(player, tile_objects):
-                    # player.pos.x += amount
+                    player.rect.left = hit.rect.right
+                    player.pos.x = hit.rect.right
+                if hit := pg.sprite.spritecollideany(player, mob_objects):
                     player.rect.left = hit.rect.right
                     player.pos.x = hit.rect.right
             if d:
                 player.pos.x += amount
                 player.update()
                 if hit := pg.sprite.spritecollideany(player, tile_objects):
-                    # player.pos.x -= amount
+                    player.rect.right = hit.rect.left
+                    player.pos.x = hit.rect.left - player.rect.width
+                if hit := pg.sprite.spritecollideany(player, mob_objects):
                     player.rect.right = hit.rect.left
                     player.pos.x = hit.rect.left - player.rect.width
 
         # Update all the mobs.
+        player.update()
         mob_objects.update()
 
         # Draw stuff.
@@ -172,6 +192,28 @@ def main():
         # Draw mobs.
         for mob in mob_objects:
             screen.blit(mob.image, camera_shift + mob.rect.topleft)
+        screen.blit(player.image, camera_shift + player.rect.topleft)
+
+        # Draw UI.
+
+        # Draw heat meter.
+        pg.draw.circle(screen, WHITE, (20, 20), 16)
+        pg.draw.rect(screen, WHITE, (20, 4, 200, 32))
+        pg.draw.circle(screen, WHITE, (220, 20), 16)
+        heat_pct = player.heat / player.max_heat
+        if heat_pct > 0:
+            red = 255
+            if heat_pct < 0.5:
+                red = pg.math.lerp(0, 255, heat_pct * 2)
+            green = 255
+            if heat_pct > 0.5:
+                green = pg.math.lerp(255, 0, (heat_pct - 0.5) * 2)
+            heat_color = (red, green, 0)
+            pg.draw.circle(screen, heat_color, (20, 20), 16)
+            pg.draw.rect(screen, heat_color, (20, 4, int(200 * heat_pct), 32))
+            pg.draw.circle(screen, heat_color, (int(200 * heat_pct) + 20, 20), 16)
+        heat_text_surf = font24.render(f"HEAT: {player.heat}/{player.max_heat}", True, BLACK)
+        screen.blit(heat_text_surf, (20, 8))
 
         # Draw targeting reticule.
         mpos = pg.mouse.get_pos()
@@ -182,8 +224,8 @@ def main():
         pg.draw.line(screen, RED, (mpos[0] + 4, mpos[1]), (mpos[0] + 12, mpos[1]), 1)
 
         # Show FPS.
-        fps_surf = font.render(f"{int(clock.get_fps())}", True, WHITE, BLACK)
-        screen.blit(fps_surf, (0, 0))
+        fps_surf = font12.render(f"{int(clock.get_fps())}", True, WHITE, BLACK)
+        screen.blit(fps_surf, (0, SCREEN_SIZE[1] - fps_surf.get_height()))
         # Update display.
         pg.display.flip()
 
