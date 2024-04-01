@@ -23,7 +23,7 @@ char_to_mob_id = {
 
 mob_health = {
     MobID.PLAYER: 100,
-    MobID.MINIGUN: 20,
+    MobID.MINIGUN: 50,
     MobID.CRATE: 10,
     MobID.BARREL: 20,
 }
@@ -47,11 +47,13 @@ class Mob(pg.sprite.Sprite):
         pg.sprite.Sprite.__init__(self)
         self.pos = pg.Vector2(pos[0] + 4, pos[1] + 4)
         self.id = char_to_mob_id[mob_id]
+        self.is_player = self.id is MobID.PLAYER
         self.weapon = mob_weapon.get(self.id, None)
         self.max_heat = mob_health.get(self.id, 100)
         self.heat = 0
         self.image = images.image_dict[mob_images[self.id]]
         self.rect = pg.Rect(pos, images.TANK_SIZE)
+        self.last_hit = 0
 
     def update(self):
         self.rect.x = int(self.pos.x)

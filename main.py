@@ -16,6 +16,7 @@ SCREEN_CENTER = pg.Vector2(SCREEN_SIZE[0] // 2, SCREEN_SIZE[1] // 2)
 SCREEN_TITLE = "Xenoreactor Overload"
 
 PLAYER_SPEED = 80
+HEALTH_BAR_FADE = 1500
 
 
 def get_screen(size: tuple[int, int], full_screen: bool = True) -> pg.Surface:
@@ -32,16 +33,6 @@ def get_font(font_path: Path, size: int) -> pg.font.Font:
 
 def int_vec(vec: pg.Vector2) -> tuple[int, int]:
     return int(vec.x), int(vec.y)
-
-
-id_to_image_id = {
-    tiles.TileID.WALL: images.ImageID.WALL,
-    mobs.MobID.PLAYER: images.ImageID.PLAYER,
-}
-
-
-def get_image(enum_id) -> pg.Surface:
-    return images.image_dict[id_to_image_id[enum_id]]
 
 
 def load_map(map_str: str) -> tuple[pg.sprite.Group, pg.sprite.Group]:
@@ -97,6 +88,11 @@ def draw_pct_bar(screen: pg.Surface, pos: tuple[int, int], color: tuple[int, int
         pg.draw.circle(screen, color, (int(200 * pct) + pos[0], pos[1]), 16)
 
 
+def draw_health_bar(screen: pg.Surface, pos: pg.Vector2, pct: float, length: int, color: pg.Color = ORANGE):
+    pg.draw.rect(screen, WHITE, (pos[0] - 1, pos[1] - 1, length + 2, 8))
+    pg.draw.rect(screen, color, (*pos, int(length * pct), 6))
+
+
 def main():
     # Set up the game window.
     icon_image = pg.Surface((32, 32))
@@ -118,12 +114,14 @@ def main():
     # Set up game world.
     tile_objects, mob_objects = load_map(maps.TESTING)
     bullets = pg.sprite.Group()
+    player_bullets = pg.sprite.Group()
     # Find the player.
     player = find_player(mob_objects)
     max_shield = 100
     shield = 100
     # Key events.
     w = s = a = d = firing = False
+    reload_timer = pg.time.get_ticks()
 
     while True:
         for event in pg.event.get():
@@ -205,24 +203,54 @@ def main():
                     player.rect.right = hit.rect.left
                     player.pos.x = hit.rect.left - player.rect.width
 
+        # Camera math.
+        camera_shift = pg.Vector2(int_vec(SCREEN_CENTER - player.rect.center))
+
+        # Fire the weapon.
+        if pg.time.get_ticks() - reload_timer >= weapons.weapon_reload[player.weapon]:
+            if firing:
+                reload_timer = pg.time.get_ticks()
+                b = weapons.Bullet(player.rect.center, pg.mouse.get_pos() - SCREEN_CENTER, player.weapon, True)
+                player_bullets.add(b)
+
         # Update all the mobs.
         player.update()
         mob_objects.update()
+        player_bullets.update(dt, tile_objects, mob_objects)
+        bullets.update(dt, tile_objects, mob_objects)
 
         # Draw stuff.
         screen.fill(BLACK)
-
-        # Camera math.
-        camera_shift = pg.Vector2(int_vec(SCREEN_CENTER - player.rect.center))
 
         # Draw map tiles.
         for tile in tile_objects:
             screen.blit(tile.image, camera_shift + tile.rect.topleft)
 
+        # Draw tile health.
+        for tile in tile_objects:
+            if pg.time.get_ticks() - tile.last_hit <= HEALTH_BAR_FADE:
+                if tile.health < tile.max_health:
+                    draw_health_bar(screen, camera_shift + (tile.rect.left, tile.rect.top - 9),
+                                    tile.health / tile.max_health, images.TILE_SIZE[0])
+
         # Draw mobs.
         for mob in mob_objects:
             screen.blit(mob.image, camera_shift + mob.rect.topleft)
         screen.blit(player.image, camera_shift + player.rect.topleft)
+
+        # Draw mob heat.
+        for mob in mob_objects:
+            if pg.time.get_ticks() - mob.last_hit <= HEALTH_BAR_FADE:
+                if mob.heat > 0:
+                    draw_health_bar(screen, camera_shift + (mob.rect.left, mob.rect.top - 9),
+                                    mob.heat / mob.max_heat, images.TANK_SIZE[0], RED)
+
+        # Draw bullets.
+        for b in bullets:
+            pg.draw.circle(screen, weapons.weapon_color[b.id], camera_shift + int_vec(b.pos),
+                           weapons.weapon_radius[b.id])
+        for b in player_bullets:
+            pg.draw.circle(screen, WHITE, camera_shift + int_vec(b.pos), weapons.weapon_radius[b.id])
 
         # Draw UI.
 

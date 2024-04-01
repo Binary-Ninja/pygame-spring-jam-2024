@@ -21,9 +21,9 @@ char_to_tile_id = {
 
 
 tile_health = {
-    TileID.WALL: 100,
+    TileID.WALL: 1000,
     TileID.DOOR: 100,
-    TileID.BRICKS: 100,
+    TileID.BRICKS: 50,
     TileID.COOLER: 200,
 }
 
@@ -41,6 +41,9 @@ class Tile(pg.sprite.Sprite):
         pg.sprite.Sprite.__init__(self)
         self.pos = pos
         self.id = char_to_tile_id[tile_id]
-        self.health = tile_health.get(self.id, 100)
+        self.immortal = self.id is TileID.WALL
+        self.max_health = tile_health.get(self.id, 100)
+        self.health = self.max_health
         self.image = images.image_dict[tile_images[self.id]]
         self.rect = pg.Rect(pos, images.TILE_SIZE)
+        self.last_hit = 0
