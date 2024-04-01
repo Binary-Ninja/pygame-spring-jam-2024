@@ -11,6 +11,7 @@ import images
 
 
 SCREEN_SIZE = (800, 600)
+SCREEN_CENTER = pg.Vector2(SCREEN_SIZE[0] // 2, SCREEN_SIZE[1] // 2)
 SCREEN_TITLE = "Xenoreactor Overload"
 
 PLAYER_SPEED = 80
@@ -53,6 +54,16 @@ def load_map(map_str: str) -> tuple[pg.sprite.Group, pg.sprite.Group]:
     return tile_objects, mob_objects
 
 
+def find_player(mob_objects: pg.sprite.Group) -> mobs.Mob:
+    for mob in mob_objects:
+        if mob.id is mobs.MobID.PLAYER:
+            return mob
+    else:
+        p = mobs.Mob((0, 0), "@")
+        mob_objects.add(p)
+        return p
+
+
 def main():
     # Set up the game window.
     icon_image = pg.Surface((32, 32))
@@ -76,13 +87,7 @@ def main():
     # Set up game world.
     tile_objects, mob_objects = load_map(maps.TESTING)
     # Find the player.
-    for mob in mob_objects:
-        if mob.id is mobs.MobID.PLAYER:
-            player = mob
-            break
-    else:
-        player = mobs.Mob((0, 0), "@")
-        mob_objects.add(player)
+    player = find_player(mob_objects)
     # Key events.
     w = s = a = d = False
 
@@ -123,29 +128,33 @@ def main():
         if moving_vertical:
             if w:
                 player.pos.y -= amount
+                player.update()
                 if hit := pg.sprite.spritecollideany(player, tile_objects):
                     # player.pos.y += amount
-                    player.rect.top = hit.rect.bottom + 1
-                    player.pos = pg.Vector2(player.rect.topleft)
+                    player.rect.top = hit.rect.bottom
+                    player.pos.y = hit.rect.bottom
             if s:
                 player.pos.y += amount
+                player.update()
                 if hit := pg.sprite.spritecollideany(player, tile_objects):
                     # player.pos.y -= amount
-                    player.rect.bottom = hit.rect.top - 1
-                    player.pos = pg.Vector2(player.rect.topleft)
+                    player.rect.bottom = hit.rect.top
+                    player.pos.y = hit.rect.top - player.rect.height
         if moving_horizontal:
             if a:
                 player.pos.x -= amount
+                player.update()
                 if hit := pg.sprite.spritecollideany(player, tile_objects):
                     # player.pos.x += amount
-                    player.rect.left = hit.rect.right + 1
-                    player.pos = pg.Vector2(player.rect.topleft)
+                    player.rect.left = hit.rect.right
+                    player.pos.x = hit.rect.right
             if d:
                 player.pos.x += amount
+                player.update()
                 if hit := pg.sprite.spritecollideany(player, tile_objects):
                     # player.pos.x -= amount
-                    player.rect.right = hit.rect.left - 1
-                    player.pos = pg.Vector2(player.rect.topleft)
+                    player.rect.right = hit.rect.left
+                    player.pos.x = hit.rect.left - player.rect.width
 
         # Update all the mobs.
         mob_objects.update()
@@ -153,11 +162,16 @@ def main():
         # Draw stuff.
         screen.fill(BLACK)
 
+        # Camera math.
+        camera_shift = pg.Vector2(int_vec(SCREEN_CENTER - player.rect.center))
+
         # Draw map tiles.
-        tile_objects.draw(screen)
+        for tile in tile_objects:
+            screen.blit(tile.image, camera_shift + tile.rect.topleft)
 
         # Draw mobs.
-        mob_objects.draw(screen)
+        for mob in mob_objects:
+            screen.blit(mob.image, camera_shift + mob.rect.topleft)
 
         # Draw targeting reticule.
         mpos = pg.mouse.get_pos()

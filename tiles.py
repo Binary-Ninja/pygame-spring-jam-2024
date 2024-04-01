@@ -7,20 +7,28 @@ import images
 
 class TileID(Enum):
     WALL = auto()
+    BRICKS = auto()
+    DOOR = auto()
 
 
 char_to_tile_id = {
     "#": TileID.WALL,
+    "+": TileID.DOOR,
+    "=": TileID.BRICKS,
 }
 
 
 tile_health = {
     TileID.WALL: 100,
+    TileID.DOOR: 100,
+    TileID.BRICKS: 100,
 }
 
 
 tile_images = {
     TileID.WALL: images.ImageID.WALL,
+    TileID.DOOR: images.ImageID.DOOR,
+    TileID.BRICKS: images.ImageID.BRICKS,
 }
 
 

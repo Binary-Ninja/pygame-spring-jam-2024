@@ -11,11 +11,15 @@ TANK_SIZE = (24, 24)
 
 class ImageID(Enum):
     WALL = auto()
+    BRICKS = auto()
+    DOOR = auto()
     PLAYER = auto()
 
 
-def make_wall_tile(color: pg.Color) -> pg.Surface:
+def make_wall_tile(color: pg.Color, bgcolor: pg.Color | None = None) -> pg.Surface:
     image = pg.Surface(TILE_SIZE).convert()
+    if bgcolor:
+        image.fill(bgcolor)
     pg.draw.rect(image, color, pg.Rect(0, 0, *TILE_SIZE), 3)
     # Draw horizontal lines.
     pg.draw.line(image, color, (0, 7), (TILE_SIZE[0], 7), 1)
@@ -28,6 +32,20 @@ def make_wall_tile(color: pg.Color) -> pg.Surface:
     pg.draw.line(image, color, (3*TILE_SIZE[0] // 4, 7), (3*TILE_SIZE[0] // 4, 15), 1)
     pg.draw.line(image, color, (TILE_SIZE[0] // 4, 23), (TILE_SIZE[0] // 4, TILE_SIZE[1]), 1)
     pg.draw.line(image, color, (3*TILE_SIZE[0] // 4, 23), (3*TILE_SIZE[0] // 4, TILE_SIZE[1]), 1)
+    return image
+
+
+def make_door_tile(color: pg.Color, bgcolor: pg.Color | None = None) -> pg.Surface:
+    image = pg.Surface(TILE_SIZE).convert()
+    if bgcolor:
+        image.fill(bgcolor)
+    pg.draw.rect(image, color, pg.Rect(0, 0, *TILE_SIZE), 3)
+    pg.draw.rect(image, color, pg.Rect(8, 8, 16, 16), 1)
+    # Draw diagonal lines.
+    pg.draw.line(image, color, (0, 0), (8, 8), 1)
+    pg.draw.line(image, color, (0, TILE_SIZE[1]), (8, TILE_SIZE[1] - 8), 1)
+    pg.draw.line(image, color, (TILE_SIZE[0], 0), (TILE_SIZE[0] - 8, 8), 1)
+    pg.draw.line(image, color, TILE_SIZE, (TILE_SIZE[0] - 8, TILE_SIZE[1] - 8), 1)
     return image
 
 
@@ -45,5 +63,7 @@ def make_images():
     global image_dict
     image_dict = {
         ImageID.WALL: make_wall_tile(MED_GRAY),
+        ImageID.BRICKS: make_wall_tile(RED, SOFT_RED),
+        ImageID.DOOR: make_door_tile(ORANGE, SOFT_ORANGE),
         ImageID.PLAYER: make_player_tile(WHITE),
     }
