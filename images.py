@@ -18,6 +18,7 @@ class ImageID(Enum):
     PLAYER = auto()
     MINIGUN = auto()
     CRATE = auto()
+    BARREL = auto()
 
 
 def make_wall_tile(color: pg.Color, bgcolor: pg.Color | None = None) -> pg.Surface:
@@ -83,6 +84,16 @@ def make_crate_tile(color: pg.Color, bgcolor: pg.Color | None = None) -> pg.Surf
     return image
 
 
+def make_barrel_tile(color: pg.Color, bgcolor: pg.Color | None = None) -> pg.Surface:
+    image = pg.Surface(TANK_SIZE).convert()
+    if bgcolor:
+        image.fill(bgcolor)
+    pg.draw.rect(image, color, pg.Rect(0, 0, *TANK_SIZE), 3)
+    pg.draw.line(image, color, (0, 0), (24, 24), 3)
+    pg.draw.line(image, color, (24, 0), (0, 24), 3)
+    return image
+
+
 image_dict = {}
 
 
@@ -97,4 +108,5 @@ def make_images():
         ImageID.PLAYER: make_player_tile(WHITE),
         ImageID.MINIGUN: make_player_tile(ORANGE),
         ImageID.CRATE: make_crate_tile(BROWN, SOFT_BROWN),
+        ImageID.BARREL: make_barrel_tile(RED, SOFT_RED),
     }

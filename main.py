@@ -7,6 +7,7 @@ from colors import *
 import maps
 import tiles
 import mobs
+import weapons
 import images
 
 
@@ -70,6 +71,32 @@ def find_player(mob_objects: pg.sprite.Group) -> mobs.Mob:
         return mobs.Mob(images.TILE_SIZE, "@")
 
 
+def heat_pct_color(pct: float) -> tuple[int, int, int]:
+    r = 255
+    if pct < 0.5:
+        r = pg.math.lerp(0, 255, pct * 2)
+    g = 255
+    if pct > 0.5:
+        g = pg.math.lerp(255, 0, (pct - 0.5) * 2)
+    return r, g, 0
+
+
+def shield_pct_color(pct: float) -> tuple[int, int, int]:
+    return 0, int(pg.math.lerp(0, 255, pct)), 255
+
+
+def draw_pct_bar(screen: pg.Surface, pos: tuple[int, int], color: tuple[int, int, int], pct: float):
+    # Draw background bar.
+    pg.draw.circle(screen, WHITE, pos, 16)
+    pg.draw.rect(screen, WHITE, (pos[0], pos[1] - 16, 200, 32))
+    pg.draw.circle(screen, WHITE, (200 + pos[0], pos[1]), 16)
+    # Draw colored bar.
+    if pct > 0:
+        pg.draw.circle(screen, color, pos, 16)
+        pg.draw.rect(screen, color, (pos[0], pos[1] - 16, int(200 * pct), 32))
+        pg.draw.circle(screen, color, (int(200 * pct) + pos[0], pos[1]), 16)
+
+
 def main():
     # Set up the game window.
     icon_image = pg.Surface((32, 32))
@@ -90,10 +117,13 @@ def main():
     images.make_images()
     # Set up game world.
     tile_objects, mob_objects = load_map(maps.TESTING)
+    bullets = pg.sprite.Group()
     # Find the player.
     player = find_player(mob_objects)
+    max_shield = 100
+    shield = 100
     # Key events.
-    w = s = a = d = False
+    w = s = a = d = firing = False
 
     while True:
         for event in pg.event.get():
@@ -107,10 +137,6 @@ def main():
                 elif event.key == pg.K_F5:
                     full_screen = not full_screen
                     screen = get_screen(SCREEN_SIZE, full_screen)
-                elif event.key == pg.K_KP_PLUS:
-                    player.heat = min(player.max_heat, player.heat + 1)
-                elif event.key == pg.K_KP_MINUS:
-                    player.heat = max(0, player.heat - 1)
                 elif event.key == pg.K_w or event.key == pg.K_UP:
                     w = True
                 elif event.key == pg.K_s or event.key == pg.K_DOWN:
@@ -128,6 +154,10 @@ def main():
                     a = False
                 elif event.key == pg.K_d or event.key == pg.K_RIGHT:
                     d = False
+            elif event.type == pg.MOUSEBUTTONDOWN:
+                firing = True
+            elif event.type == pg.MOUSEBUTTONUP:
+                firing = False
 
         # Update stuff.
         dt = clock.tick() / 1000.0
@@ -197,23 +227,21 @@ def main():
         # Draw UI.
 
         # Draw heat meter.
-        pg.draw.circle(screen, WHITE, (20, 20), 16)
-        pg.draw.rect(screen, WHITE, (20, 4, 200, 32))
-        pg.draw.circle(screen, WHITE, (220, 20), 16)
         heat_pct = player.heat / player.max_heat
-        if heat_pct > 0:
-            red = 255
-            if heat_pct < 0.5:
-                red = pg.math.lerp(0, 255, heat_pct * 2)
-            green = 255
-            if heat_pct > 0.5:
-                green = pg.math.lerp(255, 0, (heat_pct - 0.5) * 2)
-            heat_color = (red, green, 0)
-            pg.draw.circle(screen, heat_color, (20, 20), 16)
-            pg.draw.rect(screen, heat_color, (20, 4, int(200 * heat_pct), 32))
-            pg.draw.circle(screen, heat_color, (int(200 * heat_pct) + 20, 20), 16)
+        draw_pct_bar(screen, (20, 20), heat_pct_color(heat_pct), heat_pct)
         heat_text_surf = font24.render(f"HEAT: {player.heat}/{player.max_heat}", True, BLACK)
         screen.blit(heat_text_surf, (20, 8))
+
+        # Draw current weapon.
+        weapon_text_surf = font24.render(f" WEAPON: {weapons.weapon_names[player.weapon]}", True, BLACK,
+                                         weapons.weapon_color[player.weapon])
+        screen.blit(weapon_text_surf, (SCREEN_CENTER[0] - (weapon_text_surf.get_width() // 2), 8))
+
+        # Draw shield meter.
+        shield_pct = shield / max_shield
+        draw_pct_bar(screen, (SCREEN_SIZE[0] - 220, 20), shield_pct_color(shield_pct), shield_pct)
+        shield_text_surf = font24.render(f"COOL: {shield}/{max_shield}", True, BLACK)
+        screen.blit(shield_text_surf, (SCREEN_SIZE[0] - 220, 8))
 
         # Draw targeting reticule.
         mpos = pg.mouse.get_pos()
