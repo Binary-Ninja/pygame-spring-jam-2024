@@ -15,8 +15,8 @@ SCREEN_SIZE = (800, 600)
 SCREEN_CENTER = pg.Vector2(SCREEN_SIZE[0] // 2, SCREEN_SIZE[1] // 2)
 SCREEN_TITLE = "Xenoreactor Overload"
 
-PLAYER_SPEED = 80
 HEALTH_BAR_FADE = 1500
+PLAYER_HEAT_DECAY = 10
 
 
 def get_screen(size: tuple[int, int], full_screen: bool = True) -> pg.Surface:
@@ -163,11 +163,11 @@ def main():
         # Move player and do collisions.
         moving_vertical = w ^ s
         moving_horizontal = a ^ d
-        amount = PLAYER_SPEED * dt * (0.707 if moving_horizontal and moving_vertical else 1)
+        amount = mobs.mob_speed[player.id] * dt * (0.707 if moving_horizontal and moving_vertical else 1)
         if moving_vertical:
             if w:
                 player.pos.y -= amount
-                player.update()
+                player.update_rect()
                 if hit := pg.sprite.spritecollideany(player, tile_objects):
                     player.rect.top = hit.rect.bottom
                     player.pos.y = hit.rect.bottom
@@ -176,7 +176,7 @@ def main():
                     player.pos.y = hit.rect.bottom
             if s:
                 player.pos.y += amount
-                player.update()
+                player.update_rect()
                 if hit := pg.sprite.spritecollideany(player, tile_objects):
                     player.rect.bottom = hit.rect.top
                     player.pos.y = hit.rect.top - player.rect.height
@@ -186,7 +186,7 @@ def main():
         if moving_horizontal:
             if a:
                 player.pos.x -= amount
-                player.update()
+                player.update_rect()
                 if hit := pg.sprite.spritecollideany(player, tile_objects):
                     player.rect.left = hit.rect.right
                     player.pos.x = hit.rect.right
@@ -195,7 +195,7 @@ def main():
                     player.pos.x = hit.rect.right
             if d:
                 player.pos.x += amount
-                player.update()
+                player.update_rect()
                 if hit := pg.sprite.spritecollideany(player, tile_objects):
                     player.rect.right = hit.rect.left
                     player.pos.x = hit.rect.left - player.rect.width
@@ -207,18 +207,25 @@ def main():
         camera_shift = pg.Vector2(int_vec(SCREEN_CENTER - player.rect.center))
 
         # Fire the weapon.
-        if pg.time.get_ticks() - reload_timer >= weapons.weapon_reload[player.weapon]:
-            if firing:
+        if firing:
+            if pg.time.get_ticks() - reload_timer >= weapons.weapon_reload[player.weapon]:
                 reload_timer = pg.time.get_ticks()
                 b = weapons.Bullet(player.rect.center, pg.mouse.get_pos() - SCREEN_CENTER, player.weapon, True)
                 player_bullets.add(b)
 
         # Update all the mobs.
         mob_objects.add(player)
-        mob_objects.update()
+        los_lines = []
+        for m in mob_objects:
+            if m.update(dt, tile_objects, mob_objects, player, bullets):
+                los_lines.append(m.rect.center)
         player_bullets.update(dt, tile_objects, mob_objects)
         bullets.update(dt, tile_objects, mob_objects)
         mob_objects.remove(player)
+
+        # Reduce player heat.
+        player.heat -= PLAYER_HEAT_DECAY * dt
+        player.heat = max(0, player.heat)
 
         # Draw stuff.
         screen.fill(BLACK)
@@ -246,6 +253,10 @@ def main():
                     draw_health_bar(screen, camera_shift + (mob.rect.left, mob.rect.top - 9),
                                     mob.heat / mob.max_heat, images.TANK_SIZE[0], RED)
 
+        # Draw debug lines.
+        for p in los_lines:
+            pg.draw.line(screen, RED, camera_shift + p, camera_shift + player.rect.center)
+
         # Draw bullets.
         for b in bullets:
             pg.draw.circle(screen, weapons.weapon_color[b.id], camera_shift + int_vec(b.pos),
@@ -258,7 +269,7 @@ def main():
         # Draw heat meter.
         heat_pct = player.heat / player.max_heat
         draw_pct_bar(screen, (20, 20), heat_pct_color(heat_pct), heat_pct)
-        heat_text_surf = font24.render(f"HEAT: {player.heat}/{player.max_heat}", True, BLACK)
+        heat_text_surf = font24.render(f"HEAT: {int(player.heat)}/{player.max_heat}", True, BLACK)
         screen.blit(heat_text_surf, (20, 8))
 
         # Draw current weapon.

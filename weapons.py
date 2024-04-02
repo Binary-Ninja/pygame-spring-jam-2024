@@ -2,7 +2,6 @@ from enum import Enum, auto
 
 import pygame as pg
 
-import images
 from colors import *
 
 
@@ -78,11 +77,12 @@ def explosion(tile_objs: pg.sprite.Group, mob_objs: pg.sprite.Group, pos: tuple[
 
 
 class Bullet(pg.sprite.Sprite):
-    def __init__(self, start: pg.Vector2 | tuple[int, int], target: pg.Vector2, weapon_id: WeaponID, p: bool = False):
+    def __init__(self, start: pg.Vector2 | tuple[int, int] | tuple[float, float],
+                 target: pg.Vector2 | tuple[float, float], weapon_id: WeaponID, p: bool = False):
         pg.sprite.Sprite.__init__(self)
         self.id = weapon_id
         self.pos = pg.Vector2(start)
-        self.vel = target.normalize() * weapon_speed[self.id]
+        self.vel = pg.Vector2(target).normalize() * weapon_speed[self.id]
         self.rect = calc_bullet_rect(self.pos, weapon_radius[self.id])
         self.p = p
 
@@ -103,6 +103,8 @@ class Bullet(pg.sprite.Sprite):
             if hit.is_player:
                 if not self.p:
                     hit.heat += weapon_damage[self.id]
+                    if hit.heat > hit.max_heat:
+                        hit.heat = hit.max_heat
                     self.kill()
             else:
                 if self.p:
@@ -111,5 +113,5 @@ class Bullet(pg.sprite.Sprite):
                     if hit.heat >= hit.max_heat:
                         mob_objs.remove(hit)
                         if hit.is_barrel:
-                            explosion(tile_objs, mob_objs, hit.rect.center, 32 * 2, 10)
+                            explosion(tile_objs, mob_objs, hit.rect.center, 32 * 3, 10)
                     self.kill()
