@@ -42,6 +42,7 @@ class Tile(pg.sprite.Sprite):
         self.pos = pos
         self.id = char_to_tile_id[tile_id]
         self.immortal = self.id is TileID.WALL
+        self.cascading = self.id in (TileID.COOLER, TileID.DOOR)
         self.max_health = tile_health.get(self.id, 100)
         self.health = self.max_health
         self.image = images.image_dict[tile_images[self.id]]

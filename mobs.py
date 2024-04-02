@@ -24,7 +24,7 @@ char_to_mob_id = {
 mob_health = {
     MobID.PLAYER: 100,
     MobID.MINIGUN: 50,
-    MobID.CRATE: 10,
+    MobID.CRATE: 20,
     MobID.BARREL: 20,
 }
 
@@ -48,6 +48,7 @@ class Mob(pg.sprite.Sprite):
         self.pos = pg.Vector2(pos[0] + 4, pos[1] + 4)
         self.id = char_to_mob_id[mob_id]
         self.is_player = self.id is MobID.PLAYER
+        self.is_barrel = self.id is MobID.BARREL
         self.weapon = mob_weapon.get(self.id, None)
         self.max_heat = mob_health.get(self.id, 100)
         self.heat = 0

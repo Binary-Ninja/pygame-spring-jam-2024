@@ -214,10 +214,11 @@ def main():
                 player_bullets.add(b)
 
         # Update all the mobs.
-        player.update()
+        mob_objects.add(player)
         mob_objects.update()
         player_bullets.update(dt, tile_objects, mob_objects)
         bullets.update(dt, tile_objects, mob_objects)
+        mob_objects.remove(player)
 
         # Draw stuff.
         screen.fill(BLACK)
