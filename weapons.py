@@ -1,4 +1,6 @@
 from enum import Enum, auto
+import random
+import math
 
 import pygame as pg
 
@@ -7,30 +9,74 @@ from colors import *
 
 class WeaponID(Enum):
     MINIGUN = auto()
+    SHOTGUN = auto()
+    RICOCHET = auto()
+    CANNON = auto()
+    FLAME = auto()
+    ROCKET = auto()
 
 
 weapon_names = {
     WeaponID.MINIGUN: "MINIGUN",
+    WeaponID.SHOTGUN: "SHOTGUN",
+    WeaponID.RICOCHET: "RICOCHET",
+    WeaponID.CANNON: "CANNON",
+    WeaponID.FLAME: "FLAME",
+    WeaponID.ROCKET: "ROCKET",
 }
 
 weapon_reload = {
     WeaponID.MINIGUN: 100,
+    WeaponID.SHOTGUN: 1000,
+    WeaponID.RICOCHET: 500,
+    WeaponID.CANNON: 1000,
+    WeaponID.FLAME: 100,
+    WeaponID.ROCKET: 2000,
 }
 
 weapon_damage = {
     WeaponID.MINIGUN: 2,
+    WeaponID.SHOTGUN: 2,
+    WeaponID.RICOCHET: 10,
+    WeaponID.CANNON: 25,
+    WeaponID.FLAME: 5,
+    WeaponID.ROCKET: 25,
 }
 
 weapon_speed = {
     WeaponID.MINIGUN: 500,
+    WeaponID.SHOTGUN: 250,
+    WeaponID.RICOCHET: 300,
+    WeaponID.CANNON: 400,
+    WeaponID.FLAME: 200,
+    WeaponID.ROCKET: 150,
 }
 
 weapon_radius = {
     WeaponID.MINIGUN: 2,
+    WeaponID.SHOTGUN: 2,
+    WeaponID.RICOCHET: 4,
+    WeaponID.CANNON: 6,
+    WeaponID.FLAME: 10,
+    WeaponID.ROCKET: 5,
+}
+
+weapon_spread = {
+    WeaponID.MINIGUN: 4,
+    WeaponID.SHOTGUN: 20,
+    WeaponID.RICOCHET: 30,
+    WeaponID.CANNON: 0,
+    WeaponID.FLAME: 20,
+    WeaponID.ROCKET: 0,
 }
 
 weapon_color = {
     WeaponID.MINIGUN: ORANGE,
+    WeaponID.SHOTGUN: PURPLE,
+    WeaponID.RICOCHET: CYAN,
+    WeaponID.CANNON: DARK_GREEN,
+    WeaponID.FLAME: YELLOW,
+    WeaponID.ROCKET: RED,
 }
 
 
@@ -82,15 +128,30 @@ class Bullet(pg.sprite.Sprite):
         pg.sprite.Sprite.__init__(self)
         self.id = weapon_id
         self.pos = pg.Vector2(start)
-        self.vel = pg.Vector2(target).normalize() * weapon_speed[self.id]
+        spread = pg.Vector2(random.randint(-weapon_spread[self.id], weapon_spread[self.id]))
+        if self.id is WeaponID.SHOTGUN:
+            self.vel = (spread + target).normalize() * (weapon_speed[self.id] + random.randint(-20, 20))
+        else:
+            self.vel = (spread + target).normalize() * weapon_speed[self.id]
         self.rect = calc_bullet_rect(self.pos, weapon_radius[self.id])
         self.p = p
+        self.lifetime = pg.time.get_ticks()
 
-    def update(self, dt: float, tile_objs: pg.sprite.Group, mob_objs: pg.sprite.Group):
+    def update(self, dt: float, tile_objs: pg.sprite.Group, mob_objs: pg.sprite.Group, mpos: tuple[int, int],
+               p: pg.sprite.Sprite, cs: pg.Vector2):
+        if self.id is WeaponID.ROCKET:
+            if self.p:
+                self.vel = (mpos - (cs + self.pos)).normalize() * weapon_speed[self.id]
+            else:
+                self.vel = (pg.Vector2(p.rect.center) - self.pos).normalize() * weapon_speed[self.id]
         self.pos += self.vel * dt
         # Do collisions.
         self.rect = calc_bullet_rect(self.pos, weapon_radius[self.id])
         if hit := pg.sprite.spritecollideany(self, tile_objs):
+            if self.id in (WeaponID.CANNON, WeaponID.ROCKET):
+                explosion(tile_objs, mob_objs, self.rect.center, 48, weapon_damage[self.id])
+                self.kill()
+                return
             if not hit.immortal:
                 hit.health -= weapon_damage[self.id]
                 hit.last_hit = pg.time.get_ticks()
@@ -98,20 +159,42 @@ class Bullet(pg.sprite.Sprite):
                     tile_objs.remove(hit)
                     if hit.cascading:
                         destroy_cascade(tile_objs, hit)
-            self.kill()
+            if self.id is WeaponID.RICOCHET:
+                self.pos -= self.vel * dt
+                x_diff = math.fabs(hit.rect.centerx - self.rect.centerx)
+                y_diff = math.fabs(hit.rect.centery - self.rect.centery)
+                if x_diff > y_diff:
+                    self.vel.x *= -1
+                elif y_diff > x_diff:
+                    self.vel.y *= -1
+                else:
+                    self.vel *= -1
+            if self.id is not WeaponID.RICOCHET:
+                self.kill()
+            elif pg.time.get_ticks() - self.lifetime >= 2000:
+                self.kill()
+            return
         if hit := pg.sprite.spritecollideany(self, mob_objs):
             if hit.is_player:
                 if not self.p:
+                    if self.id in (WeaponID.CANNON, WeaponID.ROCKET):
+                        explosion(tile_objs, mob_objs, self.rect.center, 48, weapon_damage[self.id])
+                        self.kill()
+                        return
                     hit.heat += weapon_damage[self.id]
                     if hit.heat > hit.max_heat:
                         hit.heat = hit.max_heat
                     self.kill()
             else:
                 if self.p:
+                    if self.id in (WeaponID.CANNON, WeaponID.ROCKET):
+                        explosion(tile_objs, mob_objs, self.rect.center, 48, weapon_damage[self.id])
+                        self.kill()
+                        return
                     hit.heat += weapon_damage[self.id]
                     hit.last_hit = pg.time.get_ticks()
                     if hit.heat >= hit.max_heat:
                         mob_objs.remove(hit)
                         if hit.is_barrel:
-                            explosion(tile_objs, mob_objs, hit.rect.center, 32 * 3, 10)
+                            explosion(tile_objs, mob_objs, hit.rect.center, 32 * 3, 20)
                     self.kill()

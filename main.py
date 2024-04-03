@@ -17,6 +17,17 @@ SCREEN_TITLE = "Xenoreactor Overload"
 
 HEALTH_BAR_FADE = 1500
 PLAYER_HEAT_DECAY = 10
+PLAYER_MOVE_HEAT_DECAY_PENALTY = 2
+PLAYER_FIRE_HEAT_DECAY_PENALTY = 2
+
+key_to_weapon = {
+    pg.K_1: weapons.WeaponID.MINIGUN,
+    pg.K_2: weapons.WeaponID.SHOTGUN,
+    pg.K_3: weapons.WeaponID.RICOCHET,
+    pg.K_4: weapons.WeaponID.CANNON,
+    pg.K_5: weapons.WeaponID.FLAME,
+    pg.K_6: weapons.WeaponID.ROCKET,
+}
 
 
 def get_screen(size: tuple[int, int], full_screen: bool = True) -> pg.Surface:
@@ -109,6 +120,7 @@ def main():
     font_path = Path() / "Kenney Future.ttf"
     font12 = get_font(font_path, 12)
     font24 = get_font(font_path, 24)
+    debug = True
     # Make the images.
     images.make_images()
     # Set up game world.
@@ -135,6 +147,13 @@ def main():
                 elif event.key == pg.K_F5:
                     full_screen = not full_screen
                     screen = get_screen(SCREEN_SIZE, full_screen)
+                elif event.key in key_to_weapon.keys():
+                    player.weapon = key_to_weapon[event.key]
+                elif event.key == pg.K_e:
+                    if player.heat > 0 and shield >= 10:
+                        player.heat -= 20
+                        player.heat = max(0, player.heat)
+                        shield -= 10
                 elif event.key == pg.K_w or event.key == pg.K_UP:
                     w = True
                 elif event.key == pg.K_s or event.key == pg.K_DOWN:
@@ -153,9 +172,16 @@ def main():
                 elif event.key == pg.K_d or event.key == pg.K_RIGHT:
                     d = False
             elif event.type == pg.MOUSEBUTTONDOWN:
-                firing = True
+                if event.button == 1:
+                    firing = True
+                elif event.button == 3:
+                    if player.heat > 0 and shield >= 10:
+                        player.heat -= 20
+                        player.heat = max(0, player.heat)
+                        shield -= 10
             elif event.type == pg.MOUSEBUTTONUP:
-                firing = False
+                if event.button == 1:
+                    firing = False
 
         # Update stuff.
         dt = clock.tick() / 1000.0
@@ -212,6 +238,10 @@ def main():
                 reload_timer = pg.time.get_ticks()
                 b = weapons.Bullet(player.rect.center, pg.mouse.get_pos() - SCREEN_CENTER, player.weapon, True)
                 player_bullets.add(b)
+                if player.weapon is weapons.WeaponID.SHOTGUN:
+                    for _ in range(9):
+                        b = weapons.Bullet(player.rect.center, pg.mouse.get_pos() - SCREEN_CENTER, player.weapon, True)
+                        player_bullets.add(b)
 
         # Update all the mobs.
         mob_objects.add(player)
@@ -219,12 +249,14 @@ def main():
         for m in mob_objects:
             if m.update(dt, tile_objects, mob_objects, player, bullets):
                 los_lines.append(m.rect.center)
-        player_bullets.update(dt, tile_objects, mob_objects)
-        bullets.update(dt, tile_objects, mob_objects)
+        player_bullets.update(dt, tile_objects, mob_objects, pg.mouse.get_pos(), player, camera_shift)
+        bullets.update(dt, tile_objects, mob_objects, pg.mouse.get_pos(), player, camera_shift)
         mob_objects.remove(player)
 
         # Reduce player heat.
-        player.heat -= PLAYER_HEAT_DECAY * dt
+        decay = (PLAYER_HEAT_DECAY - (PLAYER_FIRE_HEAT_DECAY_PENALTY if firing else 0)
+                 - (PLAYER_MOVE_HEAT_DECAY_PENALTY if moving_horizontal or moving_vertical else 0))
+        player.heat -= decay * dt
         player.heat = max(0, player.heat)
 
         # Draw stuff.
@@ -254,15 +286,16 @@ def main():
                                     mob.heat / mob.max_heat, images.TANK_SIZE[0], RED)
 
         # Draw debug lines.
-        for p in los_lines:
-            pg.draw.line(screen, RED, camera_shift + p, camera_shift + player.rect.center)
+        if debug:
+            for p in los_lines:
+                pg.draw.line(screen, RED, camera_shift + p, camera_shift + player.rect.center)
 
         # Draw bullets.
         for b in bullets:
             pg.draw.circle(screen, weapons.weapon_color[b.id], camera_shift + int_vec(b.pos),
                            weapons.weapon_radius[b.id])
         for b in player_bullets:
-            pg.draw.circle(screen, WHITE, camera_shift + int_vec(b.pos), weapons.weapon_radius[b.id])
+            pg.draw.circle(screen, weapons.weapon_color[b.id], camera_shift + int_vec(b.pos), weapons.weapon_radius[b.id])
 
         # Draw UI.
 

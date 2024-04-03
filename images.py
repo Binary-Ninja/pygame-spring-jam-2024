@@ -17,6 +17,12 @@ class ImageID(Enum):
 
     PLAYER = auto()
     MINIGUN = auto()
+    SHOTGUN = auto()
+    CANNON = auto()
+    FLAME = auto()
+    ROCKET = auto()
+    RICOCHET = auto()
+    BOMB = auto()
     CRATE = auto()
     BARREL = auto()
 
@@ -94,6 +100,13 @@ def make_barrel_tile(color: pg.Color, bgcolor: pg.Color | None = None) -> pg.Sur
     return image
 
 
+def make_bomb_tank_tile(color: pg.Color) -> pg.Surface:
+    image = pg.Surface(TANK_SIZE).convert()
+    pg.draw.rect(image, color, pg.Rect(0, 0, *TANK_SIZE), 3)
+    pg.draw.circle(image, color, (TANK_SIZE[0] // 2, TANK_SIZE[1] // 2), 7, 0)
+    return image
+
+
 image_dict = {}
 
 
@@ -107,6 +120,12 @@ def make_images():
 
         ImageID.PLAYER: make_player_tile(WHITE),
         ImageID.MINIGUN: make_player_tile(ORANGE),
+        ImageID.SHOTGUN: make_player_tile(PURPLE),
+        ImageID.CANNON: make_player_tile(DARK_GREEN),
+        ImageID.FLAME: make_player_tile(YELLOW),
+        ImageID.ROCKET: make_player_tile(RED),
+        ImageID.RICOCHET: make_player_tile(CYAN),
+        ImageID.BOMB: make_bomb_tank_tile(MAGENTA),
         ImageID.CRATE: make_crate_tile(BROWN, SOFT_BROWN),
         ImageID.BARREL: make_barrel_tile(RED, SOFT_RED),
     }
