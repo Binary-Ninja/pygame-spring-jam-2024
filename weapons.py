@@ -36,7 +36,7 @@ weapon_reload = {
 
 weapon_damage = {
     WeaponID.MINIGUN: 2,
-    WeaponID.SHOTGUN: 2,
+    WeaponID.SHOTGUN: 3,
     WeaponID.RICOCHET: 10,
     WeaponID.CANNON: 25,
     WeaponID.FLAME: 5,
@@ -77,6 +77,15 @@ weapon_color = {
     WeaponID.CANNON: DARK_GREEN,
     WeaponID.FLAME: YELLOW,
     WeaponID.ROCKET: RED,
+}
+
+weapon_max_ammo = {
+    WeaponID.MINIGUN: 100,
+    WeaponID.SHOTGUN: 50,
+    WeaponID.RICOCHET: 50,
+    WeaponID.CANNON: 50,
+    WeaponID.FLAME: 200,
+    WeaponID.ROCKET: 25,
 }
 
 
@@ -140,6 +149,10 @@ class Bullet(pg.sprite.Sprite):
     def update(self, dt: float, tile_objs: pg.sprite.Group, mob_objs: pg.sprite.Group, mpos: tuple[int, int],
                p: pg.sprite.Sprite, cs: pg.Vector2):
         if self.id is WeaponID.ROCKET:
+            if pg.time.get_ticks() - self.lifetime >= 3000:
+                explosion(tile_objs, mob_objs, self.rect.center, 48, weapon_damage[self.id])
+                self.kill()
+                return
             if self.p:
                 self.vel = (mpos - (cs + self.pos)).normalize() * weapon_speed[self.id]
             else:
@@ -171,7 +184,7 @@ class Bullet(pg.sprite.Sprite):
                     self.vel *= -1
             if self.id is not WeaponID.RICOCHET:
                 self.kill()
-            elif pg.time.get_ticks() - self.lifetime >= 2000:
+            elif pg.time.get_ticks() - self.lifetime >= 3000:
                 self.kill()
             return
         if hit := pg.sprite.spritecollideany(self, mob_objs):

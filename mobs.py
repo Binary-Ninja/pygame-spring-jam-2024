@@ -19,6 +19,13 @@ class MobID(Enum):
     RICOCHET = auto()
     CRATE = auto()
     BARREL = auto()
+    MINIGUN_T = auto()
+    SHOTGUN_T = auto()
+    CANNON_T = auto()
+    FLAME_T = auto()
+    ROCKET_T = auto()
+    BOMB_T = auto()
+    RICOCHET_T = auto()
 
 
 char_to_mob_id = {
@@ -28,8 +35,15 @@ char_to_mob_id = {
     "c": MobID.CANNON,
     "f": MobID.FLAME,
     "r": MobID.ROCKET,
-    "R": MobID.RICOCHET,
+    "i": MobID.RICOCHET,
     "b": MobID.BOMB,
+    "M": MobID.MINIGUN_T,
+    "S": MobID.SHOTGUN_T,
+    "C": MobID.CANNON_T,
+    "F": MobID.FLAME_T,
+    "R": MobID.ROCKET_T,
+    "I": MobID.RICOCHET_T,
+    "B": MobID.BOMB_T,
     "%": MobID.CRATE,
     "^": MobID.BARREL,
 }
@@ -43,8 +57,16 @@ mob_health = {
     MobID.ROCKET: 75,
     MobID.RICOCHET: 60,
     MobID.BOMB: 75,
-    MobID.CRATE: 30,
-    MobID.BARREL: 30,
+    MobID.CRATE: 25,
+    MobID.BARREL: 25,
+
+    MobID.MINIGUN_T: 100,
+    MobID.SHOTGUN_T: 100,
+    MobID.CANNON_T: 125,
+    MobID.FLAME_T: 100,
+    MobID.ROCKET_T: 125,
+    MobID.RICOCHET_T: 100,
+    MobID.BOMB_T: 100,
 }
 
 mob_speed = {
@@ -54,7 +76,7 @@ mob_speed = {
     MobID.CANNON: 60,
     MobID.FLAME: 40,
     MobID.ROCKET: 60,
-    MobID.BOMB: 100,
+    MobID.BOMB: 90,
     MobID.RICOCHET: 60,
 }
 
@@ -69,6 +91,13 @@ mob_images = {
     MobID.CRATE: images.ImageID.CRATE,
     MobID.BARREL: images.ImageID.BARREL,
     MobID.RICOCHET: images.ImageID.RICOCHET,
+    MobID.RICOCHET_T: images.ImageID.RICOCHET_T,
+    MobID.MINIGUN_T: images.ImageID.MINIGUN_T,
+    MobID.SHOTGUN_T: images.ImageID.SHOTGUN_T,
+    MobID.CANNON_T: images.ImageID.CANNON_T,
+    MobID.FLAME_T: images.ImageID.FLAME_T,
+    MobID.ROCKET_T: images.ImageID.ROCKET_T,
+    MobID.BOMB_T: images.ImageID.BOMB_T,
 }
 
 mob_weapon = {
@@ -80,6 +109,13 @@ mob_weapon = {
     MobID.ROCKET: WeaponID.ROCKET,
     MobID.BOMB: WeaponID.MINIGUN,
     MobID.RICOCHET: WeaponID.RICOCHET,
+    MobID.MINIGUN_T: WeaponID.MINIGUN,
+    MobID.SHOTGUN_T: WeaponID.SHOTGUN,
+    MobID.CANNON_T: WeaponID.CANNON,
+    MobID.FLAME_T: WeaponID.FLAME,
+    MobID.ROCKET_T: WeaponID.ROCKET,
+    MobID.BOMB_T: WeaponID.MINIGUN,
+    MobID.RICOCHET_T: WeaponID.RICOCHET,
 }
 
 
@@ -99,6 +135,8 @@ class Mob(pg.sprite.Sprite):
         self.update_rect()
         self.last_hit = 0
         self.reload_timer = pg.time.get_ticks()
+        self.is_turret = self.id in (MobID.MINIGUN_T, MobID.SHOTGUN_T, MobID.RICOCHET_T, MobID.CANNON_T, MobID.FLAME_T,
+                                     MobID.ROCKET_T, MobID.BOMB_T)
 
     def update_rect(self):
         self.rect.x = int(self.pos.x)
@@ -128,35 +166,36 @@ class Mob(pg.sprite.Sprite):
                 return False
         # Fire at player.
         if distance_within(self.rect.center, player.rect.center, 32 * 2.5):
-            if self.id is MobID.BOMB:
+            if self.id in (MobID.BOMB, MobID.BOMB_T):
                 explosion(tile_objs, mob_objs, self.rect.center, 32 * 3, 20)
                 self.kill()
             else:
                 self.fire_weapon(player.rect.center, bullets)
             return True  # Don't move, just shoot.
         # Chase and fire at player.
-        vel = (pg.Vector2(player.rect.center) - self.rect.center).normalize() * dt * mob_speed[self.id]
-        self.pos.x += vel.x
-        self.update_rect()
-        if pg.sprite.spritecollideany(self, tile_objs):
-            self.pos.x -= vel.x
+        if not self.is_turret:
+            vel = (pg.Vector2(player.rect.center) - self.rect.center).normalize() * dt * mob_speed.get(self.id, 0)
+            self.pos.x += vel.x
             self.update_rect()
-        mob_objs.remove(self)
-        if pg.sprite.spritecollideany(self, mob_objs):
-            self.pos.x -= vel.x
+            if pg.sprite.spritecollideany(self, tile_objs):
+                self.pos.x -= vel.x
+                self.update_rect()
+            mob_objs.remove(self)
+            if pg.sprite.spritecollideany(self, mob_objs):
+                self.pos.x -= vel.x
+                self.update_rect()
+            mob_objs.add(self)
+            self.pos.y += vel.y
             self.update_rect()
-        mob_objs.add(self)
-        self.pos.y += vel.y
-        self.update_rect()
-        if pg.sprite.spritecollideany(self, tile_objs):
-            self.pos.y -= vel.y
-            self.update_rect()
-        mob_objs.remove(self)
-        if pg.sprite.spritecollideany(self, mob_objs):
-            self.pos.y -= vel.y
-            self.update_rect()
-        mob_objs.add(self)
-        if self.id is not MobID.BOMB:
+            if pg.sprite.spritecollideany(self, tile_objs):
+                self.pos.y -= vel.y
+                self.update_rect()
+            mob_objs.remove(self)
+            if pg.sprite.spritecollideany(self, mob_objs):
+                self.pos.y -= vel.y
+                self.update_rect()
+            mob_objs.add(self)
+        if self.id not in (MobID.BOMB, MobID.BOMB_T):
             self.fire_weapon(player.rect.center, bullets)
         return True
 

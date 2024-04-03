@@ -23,6 +23,13 @@ class ImageID(Enum):
     ROCKET = auto()
     RICOCHET = auto()
     BOMB = auto()
+    MINIGUN_T = auto()
+    SHOTGUN_T = auto()
+    CANNON_T = auto()
+    FLAME_T = auto()
+    ROCKET_T = auto()
+    RICOCHET_T = auto()
+    BOMB_T = auto()
     CRATE = auto()
     BARREL = auto()
 
@@ -100,10 +107,12 @@ def make_barrel_tile(color: pg.Color, bgcolor: pg.Color | None = None) -> pg.Sur
     return image
 
 
-def make_bomb_tank_tile(color: pg.Color) -> pg.Surface:
+def make_turret_tile(color: pg.Color) -> pg.Surface:
     image = pg.Surface(TANK_SIZE).convert()
     pg.draw.rect(image, color, pg.Rect(0, 0, *TANK_SIZE), 3)
     pg.draw.circle(image, color, (TANK_SIZE[0] // 2, TANK_SIZE[1] // 2), 7, 0)
+    pg.draw.line(image, color, (0, 0), (24, 24), 3)
+    pg.draw.line(image, color, (24, 0), (0, 24), 3)
     return image
 
 
@@ -125,7 +134,15 @@ def make_images():
         ImageID.FLAME: make_player_tile(YELLOW),
         ImageID.ROCKET: make_player_tile(RED),
         ImageID.RICOCHET: make_player_tile(CYAN),
-        ImageID.BOMB: make_bomb_tank_tile(MAGENTA),
+        ImageID.BOMB: make_player_tile(MAGENTA),
         ImageID.CRATE: make_crate_tile(BROWN, SOFT_BROWN),
         ImageID.BARREL: make_barrel_tile(RED, SOFT_RED),
+
+        ImageID.MINIGUN_T: make_turret_tile(ORANGE),
+        ImageID.SHOTGUN_T: make_turret_tile(PURPLE),
+        ImageID.CANNON_T: make_turret_tile(DARK_GREEN),
+        ImageID.FLAME_T: make_turret_tile(YELLOW),
+        ImageID.ROCKET_T: make_turret_tile(RED),
+        ImageID.RICOCHET_T: make_turret_tile(CYAN),
+        ImageID.BOMB_T: make_turret_tile(MAGENTA),
     }

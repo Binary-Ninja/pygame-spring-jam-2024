@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from enum import IntEnum
 
 import pygame as pg
 
@@ -28,6 +29,44 @@ key_to_weapon = {
     pg.K_5: weapons.WeaponID.FLAME,
     pg.K_6: weapons.WeaponID.ROCKET,
 }
+
+weapon_tuple = (
+    weapons.WeaponID.MINIGUN,
+    weapons.WeaponID.SHOTGUN,
+    weapons.WeaponID.RICOCHET,
+    weapons.WeaponID.CANNON,
+    weapons.WeaponID.FLAME,
+    weapons.WeaponID.ROCKET,
+)
+
+ammo_dict = {
+    weapons.WeaponID.MINIGUN: weapons.weapon_max_ammo[weapons.WeaponID.MINIGUN],
+    weapons.WeaponID.SHOTGUN: weapons.weapon_max_ammo[weapons.WeaponID.SHOTGUN],
+    weapons.WeaponID.RICOCHET: weapons.weapon_max_ammo[weapons.WeaponID.RICOCHET],
+    weapons.WeaponID.CANNON: weapons.weapon_max_ammo[weapons.WeaponID.CANNON],
+    weapons.WeaponID.FLAME: weapons.weapon_max_ammo[weapons.WeaponID.FLAME],
+    weapons.WeaponID.ROCKET: weapons.weapon_max_ammo[weapons.WeaponID.ROCKET],
+}
+
+
+class ParticleID:
+    EXPLOSION = 1
+
+
+class Particle(pg.sprite.Sprite):
+    def __init__(self, pos: tuple[int, int], vel: tuple[int, int], lifetime: int, eid: ParticleID):
+        pg.sprite.Sprite.__init__(self)
+        self.pos = pg.Vector2(pos)
+        self.vel = pg.Vector2(vel)
+        self.lifetime = lifetime
+        self.current_life = pg.time.get_ticks()
+        self.id = eid
+
+    def update(self, dt):
+        if pg.time.get_ticks() - self.current_life >= self.lifetime:
+            self.kill()
+            return
+        self.pos += self.vel * dt
 
 
 def get_screen(size: tuple[int, int], full_screen: bool = True) -> pg.Surface:
@@ -120,13 +159,14 @@ def main():
     font_path = Path() / "Kenney Future.ttf"
     font12 = get_font(font_path, 12)
     font24 = get_font(font_path, 24)
-    debug = True
+    debug = False
     # Make the images.
     images.make_images()
     # Set up game world.
     tile_objects, mob_objects = load_map(maps.TESTING)
     bullets = pg.sprite.Group()
     player_bullets = pg.sprite.Group()
+    particles = pg.sprite.Group()
     # Find the player.
     player = find_player(mob_objects)
     max_shield = 100
@@ -182,6 +222,14 @@ def main():
             elif event.type == pg.MOUSEBUTTONUP:
                 if event.button == 1:
                     firing = False
+            elif event.type == pg.MOUSEWHEEL:
+                current_w = weapon_tuple.index(player.weapon)
+                if event.flipped:
+                    current_w += event.y
+                else:
+                    current_w -= event.y
+                current_w %= len(weapon_tuple)
+                player.weapon = weapon_tuple[current_w]
 
         # Update stuff.
         dt = clock.tick() / 1000.0
@@ -233,8 +281,10 @@ def main():
         camera_shift = pg.Vector2(int_vec(SCREEN_CENTER - player.rect.center))
 
         # Fire the weapon.
-        if firing:
+        if firing and ammo_dict[player.weapon] > 0:
             if pg.time.get_ticks() - reload_timer >= weapons.weapon_reload[player.weapon]:
+                if player.weapon is not weapons.WeaponID.MINIGUN:
+                    ammo_dict[player.weapon] -= 1
                 reload_timer = pg.time.get_ticks()
                 b = weapons.Bullet(player.rect.center, pg.mouse.get_pos() - SCREEN_CENTER, player.weapon, True)
                 player_bullets.add(b)
@@ -253,6 +303,9 @@ def main():
         bullets.update(dt, tile_objects, mob_objects, pg.mouse.get_pos(), player, camera_shift)
         mob_objects.remove(player)
 
+        # Update particles.
+        particles.update(dt)
+
         # Reduce player heat.
         decay = (PLAYER_HEAT_DECAY - (PLAYER_FIRE_HEAT_DECAY_PENALTY if firing else 0)
                  - (PLAYER_MOVE_HEAT_DECAY_PENALTY if moving_horizontal or moving_vertical else 0))
@@ -266,29 +319,10 @@ def main():
         for tile in tile_objects:
             screen.blit(tile.image, camera_shift + tile.rect.topleft)
 
-        # Draw tile health.
-        for tile in tile_objects:
-            if pg.time.get_ticks() - tile.last_hit <= HEALTH_BAR_FADE:
-                if tile.health < tile.max_health:
-                    draw_health_bar(screen, camera_shift + (tile.rect.left, tile.rect.top - 9),
-                                    tile.health / tile.max_health, images.TILE_SIZE[0])
-
         # Draw mobs.
         for mob in mob_objects:
             screen.blit(mob.image, camera_shift + mob.rect.topleft)
         screen.blit(player.image, camera_shift + player.rect.topleft)
-
-        # Draw mob heat.
-        for mob in mob_objects:
-            if pg.time.get_ticks() - mob.last_hit <= HEALTH_BAR_FADE:
-                if mob.heat > 0:
-                    draw_health_bar(screen, camera_shift + (mob.rect.left, mob.rect.top - 9),
-                                    mob.heat / mob.max_heat, images.TANK_SIZE[0], RED)
-
-        # Draw debug lines.
-        if debug:
-            for p in los_lines:
-                pg.draw.line(screen, RED, camera_shift + p, camera_shift + player.rect.center)
 
         # Draw bullets.
         for b in bullets:
@@ -297,24 +331,63 @@ def main():
         for b in player_bullets:
             pg.draw.circle(screen, weapons.weapon_color[b.id], camera_shift + int_vec(b.pos), weapons.weapon_radius[b.id])
 
+        # Draw tile health.
+        for tile in tile_objects:
+            if pg.time.get_ticks() - tile.last_hit <= HEALTH_BAR_FADE:
+                if tile.health < tile.max_health:
+                    draw_health_bar(screen, camera_shift + (tile.rect.left, tile.rect.top - 9),
+                                    tile.health / tile.max_health, images.TILE_SIZE[0])
+
+        # Draw mob heat.
+        for mob in mob_objects:
+            if pg.time.get_ticks() - mob.last_hit <= HEALTH_BAR_FADE:
+                if mob.heat > 0:
+                    draw_health_bar(screen, camera_shift + (mob.rect.left, mob.rect.top - 9),
+                                    mob.heat / mob.max_heat, images.TANK_SIZE[0], RED)
+
+        # Draw the particles.
+        for p in particles:
+            pass
+
+        # Draw debug lines.
+        if debug:
+            for p in los_lines:
+                pg.draw.line(screen, RED, camera_shift + p, camera_shift + player.rect.center)
+
         # Draw UI.
 
         # Draw heat meter.
         heat_pct = player.heat / player.max_heat
         draw_pct_bar(screen, (20, 20), heat_pct_color(heat_pct), heat_pct)
         heat_text_surf = font24.render(f"HEAT: {int(player.heat)}/{player.max_heat}", True, BLACK)
-        screen.blit(heat_text_surf, (20, 8))
+        screen.blit(heat_text_surf, (15, 7))
 
         # Draw current weapon.
         weapon_text_surf = font24.render(f" WEAPON: {weapons.weapon_names[player.weapon]}", True, BLACK,
                                          weapons.weapon_color[player.weapon])
-        screen.blit(weapon_text_surf, (SCREEN_CENTER[0] - (weapon_text_surf.get_width() // 2), 8))
+        screen.blit(weapon_text_surf, (SCREEN_CENTER[0] - (weapon_text_surf.get_width() // 2), 4))
+        for i in range(6):
+            num_surf = font12.render(f" {i + 1}", True, BLACK, weapons.weapon_color[weapon_tuple[i]])
+            screen.blit(num_surf, ((SCREEN_CENTER[0] - (weapon_text_surf.get_width() // 2)) + (i * 13),
+                                   weapon_text_surf.get_height() + 4))
 
         # Draw shield meter.
         shield_pct = shield / max_shield
-        draw_pct_bar(screen, (SCREEN_SIZE[0] - 220, 20), shield_pct_color(shield_pct), shield_pct)
+        draw_pct_bar(screen, (20, 60), shield_pct_color(shield_pct), shield_pct)
         shield_text_surf = font24.render(f"COOL: {shield}/{max_shield}", True, BLACK)
-        screen.blit(shield_text_surf, (SCREEN_SIZE[0] - 220, 8))
+        screen.blit(shield_text_surf, (15, 47))
+        hint_text = font12.render("E OR RIGHT CLICK TO COOL", True, CYAN)
+        screen.blit(hint_text, (25, 75))
+
+        # Draw ammo meter.
+        ammo_pct = ammo_dict[player.weapon] / weapons.weapon_max_ammo[player.weapon]
+        draw_pct_bar(screen, (SCREEN_SIZE[0] - 220, 20), weapons.weapon_color[player.weapon], ammo_pct)
+        if player.weapon is weapons.WeaponID.MINIGUN:
+            text = "INFINITE AMMO"
+        else:
+            text = f"AMMO: {ammo_dict[player.weapon]}/{weapons.weapon_max_ammo[player.weapon]}"
+        ammo_text_surf = font24.render(text, True, BLACK)
+        screen.blit(ammo_text_surf, (SCREEN_SIZE[0] - 230, 7))
 
         # Draw targeting reticule.
         mpos = pg.mouse.get_pos()
