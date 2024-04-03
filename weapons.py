@@ -5,6 +5,7 @@ import math
 import pygame as pg
 
 from colors import *
+import effects
 
 
 class WeaponID(Enum):
@@ -109,7 +110,9 @@ def destroy_cascade(tile_objs: pg.sprite.Group, first: pg.sprite.Sprite):
             tile_objs.remove(t)
 
 
-def explosion(tile_objs: pg.sprite.Group, mob_objs: pg.sprite.Group, pos: tuple[float, float], dist: int, dmg: int):
+def explosion(tile_objs: pg.sprite.Group, mob_objs: pg.sprite.Group, pos: tuple[float, float], dist: int, dmg: int,
+            pgp: pg.sprite.Group):
+    pgp.add(effects.Particle(pos, (0, 0), 1000, effects.ParticleID.EXPLOSION, dist))
     for t in tile_objs.copy():
         if distance_within(t.rect.center, pos, dist):
             if not t.immortal and tile_objs.has(t):  # Check if in original group because it could have been cascaded.
@@ -129,6 +132,17 @@ def explosion(tile_objs: pg.sprite.Group, mob_objs: pg.sprite.Group, pos: tuple[
                     mob_objs.remove(m)
                     if m.is_barrel:
                         explosion(tile_objs, mob_objs, m.rect.center, 32 * 2, 10)
+                    if m.is_ammo:
+                        pgp.add(effects.Particle(pos, (0, -50), 500, effects.ParticleID.AMMO))
+                    if m.is_speed:
+                        pgp.add(effects.Particle(pos, (0, -50), 500, effects.ParticleID.SPEED))
+                    if m.is_cool:
+                        pgp.add(effects.Particle(pos, (0, -50), 500, effects.ParticleID.COOLING))
+                    if m.is_heat:
+                        pgp.add(effects.Particle(pos, (0, -50), 500, effects.ParticleID.MAX_HEAT))
+                    if m.is_w_crate:
+                        pgp.add(effects.Particle(pos, (0, -50), 500, effects.ParticleID.WEAPON_GAIN,
+                                                 None, m.weapon))
 
 
 class Bullet(pg.sprite.Sprite):
@@ -147,10 +161,10 @@ class Bullet(pg.sprite.Sprite):
         self.lifetime = pg.time.get_ticks()
 
     def update(self, dt: float, tile_objs: pg.sprite.Group, mob_objs: pg.sprite.Group, mpos: tuple[int, int],
-               p: pg.sprite.Sprite, cs: pg.Vector2):
+               p: pg.sprite.Sprite, cs: pg.Vector2, pgp: pg.sprite.Group):
         if self.id is WeaponID.ROCKET:
             if pg.time.get_ticks() - self.lifetime >= 3000:
-                explosion(tile_objs, mob_objs, self.rect.center, 48, weapon_damage[self.id])
+                explosion(tile_objs, mob_objs, self.rect.center, 48, weapon_damage[self.id], pgp)
                 self.kill()
                 return
             if self.p:
@@ -162,7 +176,7 @@ class Bullet(pg.sprite.Sprite):
         self.rect = calc_bullet_rect(self.pos, weapon_radius[self.id])
         if hit := pg.sprite.spritecollideany(self, tile_objs):
             if self.id in (WeaponID.CANNON, WeaponID.ROCKET):
-                explosion(tile_objs, mob_objs, self.rect.center, 48, weapon_damage[self.id])
+                explosion(tile_objs, mob_objs, self.rect.center, 48, weapon_damage[self.id], pgp)
                 self.kill()
                 return
             if not hit.immortal:
@@ -191,7 +205,7 @@ class Bullet(pg.sprite.Sprite):
             if hit.is_player:
                 if not self.p:
                     if self.id in (WeaponID.CANNON, WeaponID.ROCKET):
-                        explosion(tile_objs, mob_objs, self.rect.center, 48, weapon_damage[self.id])
+                        explosion(tile_objs, mob_objs, self.rect.center, 48, weapon_damage[self.id], pgp)
                         self.kill()
                         return
                     hit.heat += weapon_damage[self.id]
@@ -201,7 +215,7 @@ class Bullet(pg.sprite.Sprite):
             else:
                 if self.p:
                     if self.id in (WeaponID.CANNON, WeaponID.ROCKET):
-                        explosion(tile_objs, mob_objs, self.rect.center, 48, weapon_damage[self.id])
+                        explosion(tile_objs, mob_objs, self.rect.center, 48, weapon_damage[self.id], pgp)
                         self.kill()
                         return
                     hit.heat += weapon_damage[self.id]
@@ -209,5 +223,20 @@ class Bullet(pg.sprite.Sprite):
                     if hit.heat >= hit.max_heat:
                         mob_objs.remove(hit)
                         if hit.is_barrel:
-                            explosion(tile_objs, mob_objs, hit.rect.center, 32 * 3, 20)
+                            explosion(tile_objs, mob_objs, hit.rect.center, 32 * 3, 20, pgp)
+                        if hit.is_ammo:
+                            pgp.add(effects.Particle(hit.rect.center, (0, -50), 500,
+                                                     effects.ParticleID.AMMO))
+                        if hit.is_speed:
+                            pgp.add(effects.Particle(hit.rect.center, (0, -50), 500,
+                                                     effects.ParticleID.SPEED))
+                        if hit.is_cool:
+                            pgp.add(effects.Particle(hit.rect.center, (0, -50), 500,
+                                                     effects.ParticleID.COOLING))
+                        if hit.is_heat:
+                            pgp.add(effects.Particle(hit.rect.center, (0, -50), 500,
+                                                     effects.ParticleID.MAX_HEAT))
+                        if hit.is_w_crate:
+                            pgp.add(effects.Particle(hit.rect.center, (0, -50), 500,
+                                                     effects.ParticleID.WEAPON_GAIN, None, hit.weapon))
                     self.kill()

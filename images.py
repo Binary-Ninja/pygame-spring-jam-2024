@@ -32,6 +32,7 @@ class ImageID(Enum):
     BOMB_T = auto()
     CRATE = auto()
     BARREL = auto()
+    WEAPON_CRATE = auto()
 
 
 def make_wall_tile(color: pg.Color, bgcolor: pg.Color | None = None) -> pg.Surface:
@@ -136,6 +137,7 @@ def make_images():
         ImageID.RICOCHET: make_player_tile(CYAN),
         ImageID.BOMB: make_player_tile(MAGENTA),
         ImageID.CRATE: make_crate_tile(BROWN, SOFT_BROWN),
+        ImageID.WEAPON_CRATE: make_crate_tile(GREEN, DARK_GREEN),
         ImageID.BARREL: make_barrel_tile(RED, SOFT_RED),
 
         ImageID.MINIGUN_T: make_turret_tile(ORANGE),

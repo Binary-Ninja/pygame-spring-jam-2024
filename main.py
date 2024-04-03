@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
-from enum import IntEnum
+import math
+import random
 
 import pygame as pg
 
@@ -10,6 +11,7 @@ import tiles
 import mobs
 import weapons
 import images
+import effects
 
 
 SCREEN_SIZE = (800, 600)
@@ -48,30 +50,19 @@ ammo_dict = {
     weapons.WeaponID.ROCKET: weapons.weapon_max_ammo[weapons.WeaponID.ROCKET],
 }
 
-
-class ParticleID:
-    EXPLOSION = 1
-
-
-class Particle(pg.sprite.Sprite):
-    def __init__(self, pos: tuple[int, int], vel: tuple[int, int], lifetime: int, eid: ParticleID):
-        pg.sprite.Sprite.__init__(self)
-        self.pos = pg.Vector2(pos)
-        self.vel = pg.Vector2(vel)
-        self.lifetime = lifetime
-        self.current_life = pg.time.get_ticks()
-        self.id = eid
-
-    def update(self, dt):
-        if pg.time.get_ticks() - self.current_life >= self.lifetime:
-            self.kill()
-            return
-        self.pos += self.vel * dt
+unlock_dict = {
+    weapons.WeaponID.MINIGUN: True,
+    weapons.WeaponID.SHOTGUN: False,
+    weapons.WeaponID.RICOCHET: False,
+    weapons.WeaponID.CANNON: False,
+    weapons.WeaponID.FLAME: False,
+    weapons.WeaponID.ROCKET: False,
+}
 
 
 def get_screen(size: tuple[int, int], full_screen: bool = True) -> pg.Surface:
     """Return a pygame display surface for rendering."""
-    return pg.display.set_mode(size, pg.FULLSCREEN if full_screen else 0)
+    return pg.display.set_mode(size, (pg.FULLSCREEN if full_screen else 0))
 
 
 def get_font(font_path: Path, size: int) -> pg.font.Font:
@@ -160,6 +151,7 @@ def main():
     font12 = get_font(font_path, 12)
     font24 = get_font(font_path, 24)
     debug = False
+    draw_particles = True
     # Make the images.
     images.make_images()
     # Set up game world.
@@ -169,8 +161,8 @@ def main():
     particles = pg.sprite.Group()
     # Find the player.
     player = find_player(mob_objects)
-    max_shield = 100
-    shield = 100
+    max_shield = 10
+    shield = 10
     # Key events.
     w = s = a = d = firing = False
     reload_timer = pg.time.get_ticks()
@@ -187,13 +179,16 @@ def main():
                 elif event.key == pg.K_F5:
                     full_screen = not full_screen
                     screen = get_screen(SCREEN_SIZE, full_screen)
+                elif event.key == pg.K_F6:
+                    draw_particles = not draw_particles
                 elif event.key in key_to_weapon.keys():
-                    player.weapon = key_to_weapon[event.key]
+                    if unlock_dict[key_to_weapon[event.key]]:
+                        player.weapon = key_to_weapon[event.key]
                 elif event.key == pg.K_e:
-                    if player.heat > 0 and shield >= 10:
+                    if player.heat > 0 and shield <= max_shield:
                         player.heat -= 20
                         player.heat = max(0, player.heat)
-                        shield -= 10
+                        shield -= 1
                 elif event.key == pg.K_w or event.key == pg.K_UP:
                     w = True
                 elif event.key == pg.K_s or event.key == pg.K_DOWN:
@@ -215,21 +210,22 @@ def main():
                 if event.button == 1:
                     firing = True
                 elif event.button == 3:
-                    if player.heat > 0 and shield >= 10:
+                    if player.heat > 0 and shield <= max_shield:
                         player.heat -= 20
                         player.heat = max(0, player.heat)
-                        shield -= 10
+                        shield -= 1
             elif event.type == pg.MOUSEBUTTONUP:
                 if event.button == 1:
                     firing = False
             elif event.type == pg.MOUSEWHEEL:
                 current_w = weapon_tuple.index(player.weapon)
-                if event.flipped:
-                    current_w += event.y
-                else:
-                    current_w -= event.y
-                current_w %= len(weapon_tuple)
-                player.weapon = weapon_tuple[current_w]
+                direction = int(math.copysign(1, event.y)) if event.flipped else -int(math.copysign(1, event.y))
+                while True:
+                    current_w += direction
+                    current_w %= len(weapon_tuple)
+                    if unlock_dict[weapon_tuple[current_w]]:
+                        player.weapon = weapon_tuple[current_w]
+                        break
 
         # Update stuff.
         dt = clock.tick() / 1000.0
@@ -297,14 +293,47 @@ def main():
         mob_objects.add(player)
         los_lines = []
         for m in mob_objects:
-            if m.update(dt, tile_objects, mob_objects, player, bullets):
+            if m.update(dt, tile_objects, mob_objects, player, bullets, particles):
                 los_lines.append(m.rect.center)
-        player_bullets.update(dt, tile_objects, mob_objects, pg.mouse.get_pos(), player, camera_shift)
-        bullets.update(dt, tile_objects, mob_objects, pg.mouse.get_pos(), player, camera_shift)
+        for pb in player_bullets:
+            pb.update(dt, tile_objects, mob_objects, pg.mouse.get_pos(), player, camera_shift, particles)
+        for b in bullets:
+            b.update(dt, tile_objects, mob_objects, pg.mouse.get_pos(), player, camera_shift, particles)
         mob_objects.remove(player)
 
         # Update particles.
-        particles.update(dt)
+        for p in particles:
+            if not p.resolved:
+                p.resolved = True
+                if p.id is effects.ParticleID.AMMO:
+                    ammo_choices = []
+                    for i in range(6):
+                        if (unlock_dict[weapon_tuple[i]] and
+                                ammo_dict[weapon_tuple[i]] < weapons.weapon_max_ammo[weapon_tuple[i]]):
+                            ammo_choices.append(i)
+                    if ammo_choices:
+                        ammo_choice = random.choice(ammo_choices)
+                        ammo_dict[weapon_tuple[ammo_choice]] += 10
+                        ammo_dict[weapon_tuple[ammo_choice]] = min(weapons.weapon_max_ammo[weapon_tuple[ammo_choice]],
+                                                                   ammo_dict[weapon_tuple[ammo_choice]])
+                        p.weapon_id = weapon_tuple[ammo_choice]
+                    else:
+                        p.lifetime = 0
+                elif p.id is effects.ParticleID.SPEED:
+                    mobs.mob_speed[mobs.MobID.PLAYER] += 5
+                elif p.id is effects.ParticleID.COOLING:
+                    if shield < max_shield:
+                        shield += 1
+                    else:
+                        p.lifetime = 0
+                elif p.id is effects.ParticleID.MAX_HEAT:
+                    player.max_heat += 5
+                elif p.id is effects.ParticleID.WEAPON_GAIN:
+                    if unlock_dict[p.weapon_id]:
+                        ammo_dict[p.weapon_id] = weapons.weapon_max_ammo[p.weapon_id]
+                    else:
+                        unlock_dict[p.weapon_id] = True
+            p.update(dt)
 
         # Reduce player heat.
         decay = (PLAYER_HEAT_DECAY - (PLAYER_FIRE_HEAT_DECAY_PENALTY if firing else 0)
@@ -346,8 +375,25 @@ def main():
                                     mob.heat / mob.max_heat, images.TANK_SIZE[0], RED)
 
         # Draw the particles.
-        for p in particles:
-            pass
+        if draw_particles:
+            for p in particles:
+                if p.id is effects.ParticleID.EXPLOSION:
+                    expl_img = pg.Surface((p.radius * 2, p.radius * 2)).convert_alpha()
+                    expl_img.fill((0, 0, 0, 0))
+                    pg.draw.circle(expl_img, (*ORANGE, 128), (p.radius, p.radius), p.radius)
+                    screen.blit(expl_img, camera_shift + p.pos - (p.radius, p.radius))
+                else:
+                    if p.id in (effects.ParticleID.WEAPON_GAIN, effects.ParticleID.AMMO):
+                        if p.id is effects.ParticleID.AMMO:
+                            text = f"+10 {weapons.weapon_names[p.weapon_id]}"
+                        else:
+                            text = f"+{weapons.weapon_names[p.weapon_id]}"
+                        color = weapons.weapon_color[p.weapon_id]
+                    else:
+                        text = effects.id_to_text[p.id]
+                        color = effects.id_to_color[p.id]
+                    p_text = font12.render(text, True, color)
+                    screen.blit(p_text, camera_shift + p.pos - (p_text.get_width() // 2, p_text.get_height() // 2))
 
         # Draw debug lines.
         if debug:
@@ -367,7 +413,8 @@ def main():
                                          weapons.weapon_color[player.weapon])
         screen.blit(weapon_text_surf, (SCREEN_CENTER[0] - (weapon_text_surf.get_width() // 2), 4))
         for i in range(6):
-            num_surf = font12.render(f" {i + 1}", True, BLACK, weapons.weapon_color[weapon_tuple[i]])
+            color = weapons.weapon_color[weapon_tuple[i]] if unlock_dict[weapon_tuple[i]] else MED_GRAY
+            num_surf = font12.render(f" {i + 1}{" " if i == 0 else ""}", True, BLACK, color)
             screen.blit(num_surf, ((SCREEN_CENTER[0] - (weapon_text_surf.get_width() // 2)) + (i * 13),
                                    weapon_text_surf.get_height() + 4))
 
