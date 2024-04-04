@@ -1,4 +1,5 @@
 from enum import Enum, auto
+import random
 
 import pygame as pg
 
@@ -17,6 +18,7 @@ class MobID(Enum):
     ROCKET = auto()
     BOMB = auto()
     RICOCHET = auto()
+    PROTOTYPE = auto()
 
     MINIGUN_T = auto()
     SHOTGUN_T = auto()
@@ -42,6 +44,7 @@ class MobID(Enum):
 
 char_to_mob_id = {
     "@": MobID.PLAYER,
+    "P": MobID.PROTOTYPE,
     "m": MobID.MINIGUN,
     "s": MobID.SHOTGUN,
     "c": MobID.CANNON,
@@ -72,10 +75,11 @@ char_to_mob_id = {
 
 mob_health = {  # Crates and barrels have default health 20.
     MobID.PLAYER: 100,
+    MobID.PROTOTYPE: 300,
     MobID.MINIGUN: 50,
     MobID.SHOTGUN: 50,
     MobID.CANNON: 75,
-    MobID.FLAME: 30,
+    MobID.FLAME: 50,
     MobID.ROCKET: 75,
     MobID.RICOCHET: 60,
     MobID.BOMB: 75,
@@ -104,11 +108,13 @@ mob_speed = {
     MobID.FLAME: 40,
     MobID.ROCKET: 50,
     MobID.BOMB: 120,
+    MobID.PROTOTYPE: 95,
     MobID.RICOCHET: 60,
 }
 
 mob_images = {
     MobID.PLAYER: images.ImageID.PLAYER,
+    MobID.PROTOTYPE: images.ImageID.PLAYER,
     MobID.MINIGUN: images.ImageID.MINIGUN,
     MobID.SHOTGUN: images.ImageID.SHOTGUN,
     MobID.CANNON: images.ImageID.CANNON,
@@ -139,6 +145,7 @@ mob_images = {
 
 mob_names = {
     MobID.PLAYER: "PROTOTYPE",
+    MobID.PROTOTYPE: "PROTOTYPE",
     MobID.MINIGUN: "MINIGUN TANK",
     MobID.SHOTGUN: "SHOTGUN TANK",
     MobID.RICOCHET: "RICOCHET TANK",
@@ -171,24 +178,22 @@ mob_weapon = {
     MobID.PLAYER: WeaponID.MINIGUN,
     MobID.MINIGUN: WeaponID.MINIGUN,
     MobID.SHOTGUN: WeaponID.SHOTGUN,
+    MobID.RICOCHET: WeaponID.RICOCHET,
     MobID.CANNON: WeaponID.CANNON,
     MobID.FLAME: WeaponID.FLAME,
     MobID.ROCKET: WeaponID.ROCKET,
-    MobID.BOMB: WeaponID.MINIGUN,
-    MobID.RICOCHET: WeaponID.RICOCHET,
     MobID.MINIGUN_T: WeaponID.MINIGUN,
     MobID.SHOTGUN_T: WeaponID.SHOTGUN,
+    MobID.RICOCHET_T: WeaponID.RICOCHET,
     MobID.CANNON_T: WeaponID.CANNON,
     MobID.FLAME_T: WeaponID.FLAME,
     MobID.ROCKET_T: WeaponID.ROCKET,
-    MobID.BOMB_T: WeaponID.MINIGUN,
-    MobID.RICOCHET_T: WeaponID.RICOCHET,
     MobID.MINIGUN_C: WeaponID.MINIGUN,
     MobID.SHOTGUN_C: WeaponID.SHOTGUN,
+    MobID.RICOCHET_C: WeaponID.RICOCHET,
     MobID.CANNON_C: WeaponID.CANNON,
     MobID.FLAME_C: WeaponID.FLAME,
     MobID.ROCKET_C: WeaponID.ROCKET,
-    MobID.RICOCHET_C: WeaponID.RICOCHET,
 }
 
 
@@ -246,6 +251,9 @@ class Mob(pg.sprite.Sprite):
         for t in tile_objs:
             if t.rect.clipline(self.rect.center, player.rect.center):
                 return False
+        # Choose random weapon.
+        if self.id is MobID.PROTOTYPE:
+            self.weapon = random.choice(tuple(weapons.WeaponID))
         # Fire at player.
         if distance_within(self.rect.center, player.rect.center, 32 * 2.5):
             if self.id in (MobID.BOMB, MobID.BOMB_T):

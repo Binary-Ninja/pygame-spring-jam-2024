@@ -73,20 +73,25 @@ def load_map(map_str: str) -> tuple[pg.sprite.Group, pg.sprite.Group]:
         if char in mobs.char_to_mob_id.keys():
             mob_objects.add(mobs.Mob((x, y), char))
         if char == "x":
-            mob_char = random.choice("msicfrb")
-            mob_objects.add(mobs.Mob((x, y), mob_char))
+            mob_objects.add(mobs.Mob((x, y), random.choice("msicfrb")))
         if char == "X":
-            mob_char = random.choice("MSICFRB")
-            mob_objects.add(mobs.Mob((x, y), mob_char))
+            mob_objects.add(mobs.Mob((x, y), random.choice("MSICFRB")))
+        if char == "Z":
+            mob_objects.add(mobs.Mob((x, y), random.choice("MSICFRBmsicfrb")))
         if char == "&":
-            mob_char = random.choice("*!>$")
-            mob_objects.add(mobs.Mob((x, y), mob_char))
+            mob_objects.add(mobs.Mob((x, y), random.choice("*!>$")))
         if char == "_":
-            mob_char = random.choice("^%")
-            mob_objects.add(mobs.Mob((x, y), mob_char))
+            mob_objects.add(mobs.Mob((x, y), random.choice("^%")))
         if char == "-":
-            mob_char = random.choice("^%^%*!$>")
-            mob_objects.add(mobs.Mob((x, y), mob_char))
+            mob_objects.add(mobs.Mob((x, y), random.choice("^%^%*!$>")))
+        if char == "<":
+            mob_objects.add(mobs.Mob((x, y), random.choice("*!")))
+        if char == "`":
+            tile_objects.add(tiles.Tile((x, y), random.choice("~=")))
+        if char == "0":
+            tile_objects.add(tiles.Tile((x, y), random.choice("#=+~")))
+        if char == "O":
+            tile_objects.add(tiles.Tile((x, y), random.choice("#=+")))
         x += images.TILE_SIZE[0]
     return tile_objects, mob_objects
 
@@ -141,11 +146,23 @@ def count_coolers(objs: pg.sprite.Group) -> int:
 
 class MenuText:
     def __init__(self, img: pg.Surface, pos: tuple[float, int]):
-        self.img = img
+        self.img = img.convert()
+        self.hover_img = img.convert_alpha()
+        temp_img = pg.Surface(self.hover_img.get_size()).convert_alpha()
+        temp_img.fill((*WHITE, 64))
+        self.hover_img.blit(temp_img, (0, 0))
         self.rect = self.img.get_rect().move(pos)
+        self.hover = False
+
+    def handle_hover(self, pos: tuple[int, int]):
+        self.hover = self.rect.collidepoint(pos)
+
+    def get_img(self) -> pg.Surface:
+        return self.hover_img if self.hover else self.img
 
 
 level_dict = {
+    0: maps.TESTING,
     1: maps.LEVEL1,
     2: maps.LEVEL2,
     3: maps.LEVEL3,
@@ -158,6 +175,9 @@ level_dict = {
     10: maps.LEVEL10,
     11: maps.LEVEL11,
     12: maps.LEVEL12,
+    13: maps.LEVEL13,
+    14: maps.LEVEL14,
+    15: maps.TESTING,
 }
 
 
@@ -184,15 +204,15 @@ def main():
     images.make_images()
     # Menu texts.
     next_level_text = font36.render(" ALL COOLERS DESTROYED", True, BLACK, CYAN)
-    next_level_text = MenuText(next_level_text, (SCREEN_CENTER[0] - next_level_text.get_width() // 2, 200))
+    next_level_text = MenuText(next_level_text, (SCREEN_CENTER[0] - next_level_text.get_width() // 2, 100))
     game_over_text = font36.render(" CORE OVERHEATED", True, BLACK, RED)
-    game_over_text = MenuText(game_over_text, (SCREEN_CENTER[0] - game_over_text.get_width() // 2, 200))
+    game_over_text = MenuText(game_over_text, (SCREEN_CENTER[0] - game_over_text.get_width() // 2, 100))
     quit_button = font24.render(" QUIT PROGRAM", True, BLACK, RED)
-    quit_button = MenuText(quit_button, (SCREEN_CENTER[0] - quit_button.get_width() // 2, 350))
+    quit_button = MenuText(quit_button, (SCREEN_CENTER[0] - quit_button.get_width() // 2, 450))
     next_level_button = font24.render(" NEXT STAGE", True, BLACK, GREEN)
-    next_level_button = MenuText(next_level_button, (SCREEN_CENTER[0] - next_level_button.get_width() // 2, 300))
+    next_level_button = MenuText(next_level_button, (SCREEN_CENTER[0] - next_level_button.get_width() // 2, 400))
     restart_button = font24.render(" RESTART PROGRAM", True, BLACK, GREEN)
-    restart_button = MenuText(restart_button, (SCREEN_CENTER[0] - restart_button.get_width() // 2, 300))
+    restart_button = MenuText(restart_button, (SCREEN_CENTER[0] - restart_button.get_width() // 2, 400))
     overheating_surf = pg.Surface(SCREEN_SIZE).convert_alpha()
     overheating_surf.fill((*RED, 64))
     # Key events.
@@ -229,6 +249,10 @@ def main():
     # Scene variables.
     game_over = False
     next_level = False
+    level_timer_start = pg.time.get_ticks()
+    run_start = pg.time.get_ticks()
+    run_ms = 0
+    run_cum = 0
 
     while True:
         for event in pg.event.get():
@@ -299,13 +323,15 @@ def main():
                             # Scene variables.
                             game_over = False
                             next_level = False
+                            level_timer_start = pg.time.get_ticks()
+                            run_ms = 0
                     elif game_over:
                         if quit_button.rect.collidepoint(event.pos):
                             pg.quit()
                             sys.exit()
                         if restart_button.rect.collidepoint(event.pos):
                             # Set up game world.
-                            current_level = 0
+                            current_level = 1
                             tile_objects, mob_objects = load_map(level_dict[current_level])
                             bullets = pg.sprite.Group()
                             player_bullets = pg.sprite.Group()
@@ -334,6 +360,10 @@ def main():
                             # Scene variables.
                             game_over = False
                             next_level = False
+                            level_timer_start = pg.time.get_ticks()
+                            run_start = pg.time.get_ticks()
+                            run_ms = 0
+                            run_cum = 0
                     else:
                         firing = True
                 elif event.button == 3:
@@ -353,9 +383,17 @@ def main():
                     if unlock_dict[weapon_tuple[current_w]]:
                         player.weapon = weapon_tuple[current_w]
                         break
+            elif event.type == pg.MOUSEMOTION:
+                if next_level:
+                    next_level_button.handle_hover(event.pos)
+                if game_over:
+                    restart_button.handle_hover(event.pos)
+                if next_level or game_over:
+                    quit_button.handle_hover(event.pos)
 
         # Update stuff.
-        dt = clock.tick() / 1000.0
+        ems = clock.tick()
+        dt = ems / 1000.0
 
         # Move player and do collisions.
         moving_vertical = w ^ s
@@ -478,12 +516,24 @@ def main():
             player.heat -= decay * dt
             player.heat = max(0, player.heat)
         if game_over:
-            player.heat = 100
+            player.heat = player.max_heat
 
         # Detect game over.
         if player.heat > player.max_heat:
             game_over = True
             firing = False
+
+        # Level timer.
+        if game_over or next_level:
+            pass
+        else:
+            run_ms = pg.time.get_ticks() - level_timer_start
+
+        # Run timer.
+        if game_over or next_level or current_level == 14:
+            run_start += ems
+        else:
+            run_cum = pg.time.get_ticks() - run_start
 
         # Draw stuff.
         screen.fill(BLACK)
@@ -603,16 +653,46 @@ def main():
         cooler_text = font12.render(f"SPEED: {mobs.mob_speed[player.id]}", True, YELLOW)
         screen.blit(cooler_text, (SCREEN_SIZE[0] - cooler_text.get_width() - 5, 50))
 
+        # Level timer.
+        x = run_ms // 1000
+        run_s = x % 60
+        x //= 60
+        run_m = x % 60
+        x //= 60
+        run_h = x % 24
+        s_z = "0" if run_s < 10 else ""
+        trail = run_ms % 1000
+        timer_text = font12.render(f"TIMER: {run_h:0>2}:{run_m:0>2}:{s_z}{run_s}.{trail}", True, GREEN)
+        screen.blit(timer_text, (0, SCREEN_SIZE[1] - timer_text.get_height() - 15))
+
+        # Run timer.
+        x = run_cum // 1000
+        crun_s = x % 60
+        x //= 60
+        crun_m = x % 60
+        x //= 60
+        crun_h = x % 24
+        cs_z = "0" if crun_s < 10 else ""
+        ctrail = run_cum % 1000
+        timer_text = font12.render(f"TOTAL: {crun_h:0>2}:{crun_m:0>2}:{cs_z}{crun_s}.{ctrail}", True, GREEN)
+        screen.blit(timer_text, (0, SCREEN_SIZE[1] - timer_text.get_height()))
+
         # Draw the next level screen.
         if next_level:
-            screen.blit(next_level_text.img, next_level_text.rect)
-            screen.blit(next_level_button.img, next_level_button.rect)
-            screen.blit(quit_button.img, quit_button.rect)
+            screen.blit(next_level_text.get_img(), next_level_text.rect)
+            screen.blit(next_level_button.get_img(), next_level_button.rect)
+            screen.blit(quit_button.get_img(), quit_button.rect)
+            timer_text = font24.render(f" TIMER: {run_h:0>2}:{run_m:0>2}:{s_z}{run_s}.{trail}",
+                                       True, BLACK, YELLOW)
+            screen.blit(timer_text, (SCREEN_CENTER[0] - timer_text.get_width() // 2, 150))
         # Draw the game over screen.
         elif game_over:
-            screen.blit(game_over_text.img, game_over_text.rect)
-            screen.blit(restart_button.img, restart_button.rect)
-            screen.blit(quit_button.img, quit_button.rect)
+            screen.blit(game_over_text.get_img(), game_over_text.rect)
+            screen.blit(restart_button.get_img(), restart_button.rect)
+            screen.blit(quit_button.get_img(), quit_button.rect)
+            timer_text = font24.render(f" TIMER: {run_h:0>2}:{run_m:0>2}:{s_z}{run_s}.{trail}",
+                                       True, BLACK, YELLOW)
+            screen.blit(timer_text, (SCREEN_CENTER[0] - timer_text.get_width() // 2, 150))
 
         # Draw targeting reticule.
         mpos = pg.mouse.get_pos()
@@ -623,8 +703,9 @@ def main():
         pg.draw.line(screen, RED, (mpos[0] + 4, mpos[1]), (mpos[0] + 12, mpos[1]), 1)
 
         # Show FPS.
-        fps_surf = font12.render(f"{int(clock.get_fps())}", True, WHITE, BLACK)
-        screen.blit(fps_surf, (0, SCREEN_SIZE[1] - fps_surf.get_height()))
+        if debug:
+            fps_surf = font12.render(f"{int(clock.get_fps())}", True, WHITE, BLACK)
+            screen.blit(fps_surf, (SCREEN_SIZE[0] - fps_surf.get_width(), SCREEN_SIZE[1] - fps_surf.get_height()))
         # Update display.
         pg.display.flip()
 
