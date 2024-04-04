@@ -48,11 +48,10 @@ def get_screen(size: tuple[int, int], full_screen: bool = True) -> pg.Surface:
 
 
 def get_font(font_path: Path, size: int) -> pg.font.Font:
-    return pg.font.Font(font_path, size)
-    # if font_path.exists():
-    #     return pg.font.Font(font_path, size)
-    # else:
-    #     return pg.font.Font(None, size)
+    if font_path.exists():
+        return pg.font.Font(font_path, size)
+    else:
+        return pg.font.Font(None, size)
 
 
 def int_vec(vec: pg.Vector2) -> tuple[int, int]:
