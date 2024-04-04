@@ -70,7 +70,7 @@ char_to_mob_id = {
     "6": MobID.ROCKET_C,
 }
 
-mob_health = {  # Crates and barrels have default health 25.
+mob_health = {  # Crates and barrels have default health 20.
     MobID.PLAYER: 100,
     MobID.MINIGUN: 50,
     MobID.SHOTGUN: 50,
@@ -100,10 +100,10 @@ mob_speed = {
     MobID.MINIGUN: 50,
     MobID.PLAYER: 80,
     MobID.SHOTGUN: 60,
-    MobID.CANNON: 60,
+    MobID.CANNON: 50,
     MobID.FLAME: 40,
-    MobID.ROCKET: 60,
-    MobID.BOMB: 100,
+    MobID.ROCKET: 50,
+    MobID.BOMB: 120,
     MobID.RICOCHET: 60,
 }
 
@@ -135,6 +135,36 @@ mob_images = {
     MobID.CANNON_C: images.ImageID.WEAPON_CRATE,
     MobID.FLAME_C: images.ImageID.WEAPON_CRATE,
     MobID.ROCKET_C: images.ImageID.WEAPON_CRATE,
+}
+
+mob_names = {
+    MobID.PLAYER: "PROTOTYPE",
+    MobID.MINIGUN: "MINIGUN TANK",
+    MobID.SHOTGUN: "SHOTGUN TANK",
+    MobID.RICOCHET: "RICOCHET TANK",
+    MobID.CANNON: "CANNON TANK",
+    MobID.FLAME: "FLAME TANK",
+    MobID.ROCKET: "ROCKET TANK",
+    MobID.BOMB: "MOBILE BOMB",
+    MobID.CRATE: "CRATE",
+    MobID.AMMO_CRATE: "CRATE",
+    MobID.SPEED_CRATE: "CRATE",
+    MobID.COOL_CRATE: "CRATE",
+    MobID.MAX_HEAT_CRATE: "CRATE",
+    MobID.BARREL: "TNT",
+    MobID.MINIGUN_T: "MINIGUN TURRET",
+    MobID.SHOTGUN_T: "SHOTGUN TURRET",
+    MobID.RICOCHET_T: "RICOCHET TURRET",
+    MobID.CANNON_T: "CANNON TURRET",
+    MobID.FLAME_T: "FLAME TURRET",
+    MobID.ROCKET_T: "ROCKET TURRET",
+    MobID.BOMB_T: "PROXIMITY MINE",
+    MobID.RICOCHET_C: "WEAPON CRATE",
+    MobID.MINIGUN_C: "WEAPON CRATE",
+    MobID.SHOTGUN_C: "WEAPON CRATE",
+    MobID.CANNON_C: "WEAPON CRATE",
+    MobID.FLAME_C: "WEAPON CRATE",
+    MobID.ROCKET_C: "WEAPON CRATE",
 }
 
 mob_weapon = {
@@ -179,7 +209,7 @@ class Mob(pg.sprite.Sprite):
         self.is_cool = self.id is MobID.COOL_CRATE
         self.is_heat = self.id is MobID.MAX_HEAT_CRATE
         self.weapon = mob_weapon.get(self.id, None)
-        self.max_heat = mob_health.get(self.id, 25)
+        self.max_heat = mob_health.get(self.id, 20)
         self.heat = 0
         self.image = images.image_dict[mob_images[self.id]]
         self.rect = pg.Rect(pos, images.TANK_SIZE)

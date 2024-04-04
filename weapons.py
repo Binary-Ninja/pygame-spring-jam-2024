@@ -131,7 +131,7 @@ def explosion(tile_objs: pg.sprite.Group, mob_objs: pg.sprite.Group, pos: tuple[
                 if m.heat >= m.max_heat:
                     mob_objs.remove(m)
                     if m.is_barrel:
-                        explosion(tile_objs, mob_objs, m.rect.center, 32 * 2, 10)
+                        explosion(tile_objs, mob_objs, m.rect.center, 32 * 3, 20, pgp)
                     if m.is_ammo:
                         pgp.add(effects.Particle(pos, (0, -50), 500, effects.ParticleID.AMMO))
                     if m.is_speed:
@@ -198,7 +198,7 @@ class Bullet(pg.sprite.Sprite):
                     self.vel *= -1
             if self.id is not WeaponID.RICOCHET:
                 self.kill()
-            elif pg.time.get_ticks() - self.lifetime >= 3000:
+            elif pg.time.get_ticks() - self.lifetime >= 4000:
                 self.kill()
             return
         if hit := pg.sprite.spritecollideany(self, mob_objs):
@@ -209,8 +209,6 @@ class Bullet(pg.sprite.Sprite):
                         self.kill()
                         return
                     hit.heat += weapon_damage[self.id]
-                    if hit.heat > hit.max_heat:
-                        hit.heat = hit.max_heat
                     self.kill()
             else:
                 if self.p:

@@ -17,7 +17,7 @@ class ParticleID(IntEnum):
 
 id_to_text = {
     ParticleID.AMMO: "+10 AMMO",
-    ParticleID.SPEED: "+5 SPEED",
+    ParticleID.SPEED: "+2 SPEED",
     ParticleID.COOLING: "+1 COOLING",
     ParticleID.MAX_HEAT: "+5 MAX HEAT",
     ParticleID.WEAPON_GAIN: "+WEAPON",

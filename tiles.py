@@ -35,6 +35,13 @@ tile_images = {
     TileID.COOLER: images.ImageID.COOLER,
 }
 
+tile_names = {
+    TileID.WALL: "WALL",
+    TileID.DOOR: "DOOR",
+    TileID.BRICKS: "BRICKS",
+    TileID.COOLER: "COOLER",
+}
+
 
 class Tile(pg.sprite.Sprite):
     def __init__(self, pos: tuple[int, int], tile_id: str):

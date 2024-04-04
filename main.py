@@ -41,24 +41,6 @@ weapon_tuple = (
     weapons.WeaponID.ROCKET,
 )
 
-ammo_dict = {
-    weapons.WeaponID.MINIGUN: weapons.weapon_max_ammo[weapons.WeaponID.MINIGUN],
-    weapons.WeaponID.SHOTGUN: weapons.weapon_max_ammo[weapons.WeaponID.SHOTGUN],
-    weapons.WeaponID.RICOCHET: weapons.weapon_max_ammo[weapons.WeaponID.RICOCHET],
-    weapons.WeaponID.CANNON: weapons.weapon_max_ammo[weapons.WeaponID.CANNON],
-    weapons.WeaponID.FLAME: weapons.weapon_max_ammo[weapons.WeaponID.FLAME],
-    weapons.WeaponID.ROCKET: weapons.weapon_max_ammo[weapons.WeaponID.ROCKET],
-}
-
-unlock_dict = {
-    weapons.WeaponID.MINIGUN: True,
-    weapons.WeaponID.SHOTGUN: False,
-    weapons.WeaponID.RICOCHET: False,
-    weapons.WeaponID.CANNON: False,
-    weapons.WeaponID.FLAME: False,
-    weapons.WeaponID.ROCKET: False,
-}
-
 
 def get_screen(size: tuple[int, int], full_screen: bool = True) -> pg.Surface:
     """Return a pygame display surface for rendering."""
@@ -90,6 +72,21 @@ def load_map(map_str: str) -> tuple[pg.sprite.Group, pg.sprite.Group]:
             tile_objects.add(tiles.Tile((x, y), char))
         if char in mobs.char_to_mob_id.keys():
             mob_objects.add(mobs.Mob((x, y), char))
+        if char == "x":
+            mob_char = random.choice("msicfrb")
+            mob_objects.add(mobs.Mob((x, y), mob_char))
+        if char == "X":
+            mob_char = random.choice("MSICFRB")
+            mob_objects.add(mobs.Mob((x, y), mob_char))
+        if char == "&":
+            mob_char = random.choice("*!>$")
+            mob_objects.add(mobs.Mob((x, y), mob_char))
+        if char == "_":
+            mob_char = random.choice("^%")
+            mob_objects.add(mobs.Mob((x, y), mob_char))
+        if char == "-":
+            mob_char = random.choice("^%^%*!$>")
+            mob_objects.add(mobs.Mob((x, y), mob_char))
         x += images.TILE_SIZE[0]
     return tile_objects, mob_objects
 
@@ -134,6 +131,36 @@ def draw_health_bar(screen: pg.Surface, pos: pg.Vector2, pct: float, length: int
     pg.draw.rect(screen, color, (*pos, int(length * pct), 6))
 
 
+def count_coolers(objs: pg.sprite.Group) -> int:
+    c = 0
+    for t in objs:
+        if t.id is tiles.TileID.COOLER:
+            c += 1
+    return c
+
+
+class MenuText:
+    def __init__(self, img: pg.Surface, pos: tuple[float, int]):
+        self.img = img
+        self.rect = self.img.get_rect().move(pos)
+
+
+level_dict = {
+    1: maps.LEVEL1,
+    2: maps.LEVEL2,
+    3: maps.LEVEL3,
+    4: maps.LEVEL4,
+    5: maps.LEVEL5,
+    6: maps.LEVEL6,
+    7: maps.LEVEL7,
+    8: maps.LEVEL8,
+    9: maps.LEVEL9,
+    10: maps.LEVEL10,
+    11: maps.LEVEL11,
+    12: maps.LEVEL12,
+}
+
+
 def main():
     # Set up the game window.
     icon_image = pg.Surface((32, 32))
@@ -150,12 +177,30 @@ def main():
     font_path = Path() / "Kenney Future.ttf"
     font12 = get_font(font_path, 12)
     font24 = get_font(font_path, 24)
+    font36 = get_font(font_path, 36)
     debug = False
     draw_particles = True
     # Make the images.
     images.make_images()
+    # Menu texts.
+    next_level_text = font36.render(" ALL COOLERS DESTROYED", True, BLACK, CYAN)
+    next_level_text = MenuText(next_level_text, (SCREEN_CENTER[0] - next_level_text.get_width() // 2, 200))
+    game_over_text = font36.render(" CORE OVERHEATED", True, BLACK, RED)
+    game_over_text = MenuText(game_over_text, (SCREEN_CENTER[0] - game_over_text.get_width() // 2, 200))
+    quit_button = font24.render(" QUIT PROGRAM", True, BLACK, RED)
+    quit_button = MenuText(quit_button, (SCREEN_CENTER[0] - quit_button.get_width() // 2, 350))
+    next_level_button = font24.render(" NEXT STAGE", True, BLACK, GREEN)
+    next_level_button = MenuText(next_level_button, (SCREEN_CENTER[0] - next_level_button.get_width() // 2, 300))
+    restart_button = font24.render(" RESTART PROGRAM", True, BLACK, GREEN)
+    restart_button = MenuText(restart_button, (SCREEN_CENTER[0] - restart_button.get_width() // 2, 300))
+    overheating_surf = pg.Surface(SCREEN_SIZE).convert_alpha()
+    overheating_surf.fill((*RED, 64))
+    # Key events.
+    w = s = a = d = firing = False
+    reload_timer = pg.time.get_ticks()
     # Set up game world.
-    tile_objects, mob_objects = load_map(maps.TESTING)
+    current_level = 1
+    tile_objects, mob_objects = load_map(level_dict[current_level])
     bullets = pg.sprite.Group()
     player_bullets = pg.sprite.Group()
     particles = pg.sprite.Group()
@@ -163,9 +208,27 @@ def main():
     player = find_player(mob_objects)
     max_shield = 10
     shield = 10
-    # Key events.
-    w = s = a = d = firing = False
-    reload_timer = pg.time.get_ticks()
+    p_m_heat = player.max_heat
+    ammo_dict = {
+        weapons.WeaponID.MINIGUN: weapons.weapon_max_ammo[weapons.WeaponID.MINIGUN],
+        weapons.WeaponID.SHOTGUN: weapons.weapon_max_ammo[weapons.WeaponID.SHOTGUN],
+        weapons.WeaponID.RICOCHET: weapons.weapon_max_ammo[weapons.WeaponID.RICOCHET],
+        weapons.WeaponID.CANNON: weapons.weapon_max_ammo[weapons.WeaponID.CANNON],
+        weapons.WeaponID.FLAME: weapons.weapon_max_ammo[weapons.WeaponID.FLAME],
+        weapons.WeaponID.ROCKET: weapons.weapon_max_ammo[weapons.WeaponID.ROCKET],
+    }
+
+    unlock_dict = {
+        weapons.WeaponID.MINIGUN: True,
+        weapons.WeaponID.SHOTGUN: False,
+        weapons.WeaponID.RICOCHET: False,
+        weapons.WeaponID.CANNON: False,
+        weapons.WeaponID.FLAME: False,
+        weapons.WeaponID.ROCKET: False,
+    }
+    # Scene variables.
+    game_over = False
+    next_level = False
 
     while True:
         for event in pg.event.get():
@@ -180,12 +243,14 @@ def main():
                     full_screen = not full_screen
                     screen = get_screen(SCREEN_SIZE, full_screen)
                 elif event.key == pg.K_F6:
-                    draw_particles = not draw_particles
+                    debug = not debug
                 elif event.key in key_to_weapon.keys():
                     if unlock_dict[key_to_weapon[event.key]]:
                         player.weapon = key_to_weapon[event.key]
                 elif event.key == pg.K_e:
-                    if player.heat > 0 and shield <= max_shield:
+                    if next_level or game_over:
+                        continue
+                    if player.heat > 0 and shield <= max_shield and shield > 0:
                         player.heat -= 20
                         player.heat = max(0, player.heat)
                         shield -= 1
@@ -208,9 +273,71 @@ def main():
                     d = False
             elif event.type == pg.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    firing = True
+                    if next_level:
+                        if quit_button.rect.collidepoint(event.pos):
+                            pg.quit()
+                            sys.exit()
+                        if next_level_button.rect.collidepoint(event.pos):
+                            # Set up game world.
+                            current_level += 1
+                            tile_objects, mob_objects = load_map(level_dict[current_level])
+                            bullets = pg.sprite.Group()
+                            player_bullets = pg.sprite.Group()
+                            particles = pg.sprite.Group()
+                            # Find the player.
+                            player = find_player(mob_objects)
+                            player.max_heat = p_m_heat
+                            shield = max_shield
+                            ammo_dict = {
+                                weapons.WeaponID.MINIGUN: weapons.weapon_max_ammo[weapons.WeaponID.MINIGUN],
+                                weapons.WeaponID.SHOTGUN: weapons.weapon_max_ammo[weapons.WeaponID.SHOTGUN],
+                                weapons.WeaponID.RICOCHET: weapons.weapon_max_ammo[weapons.WeaponID.RICOCHET],
+                                weapons.WeaponID.CANNON: weapons.weapon_max_ammo[weapons.WeaponID.CANNON],
+                                weapons.WeaponID.FLAME: weapons.weapon_max_ammo[weapons.WeaponID.FLAME],
+                                weapons.WeaponID.ROCKET: weapons.weapon_max_ammo[weapons.WeaponID.ROCKET],
+                            }
+                            # Scene variables.
+                            game_over = False
+                            next_level = False
+                    elif game_over:
+                        if quit_button.rect.collidepoint(event.pos):
+                            pg.quit()
+                            sys.exit()
+                        if restart_button.rect.collidepoint(event.pos):
+                            # Set up game world.
+                            current_level = 0
+                            tile_objects, mob_objects = load_map(level_dict[current_level])
+                            bullets = pg.sprite.Group()
+                            player_bullets = pg.sprite.Group()
+                            particles = pg.sprite.Group()
+                            # Find the player.
+                            mobs.mob_speed[mobs.MobID.PLAYER] = 80
+                            player = find_player(mob_objects)
+                            p_m_heat = player.max_heat
+                            shield = max_shield
+                            ammo_dict = {
+                                weapons.WeaponID.MINIGUN: weapons.weapon_max_ammo[weapons.WeaponID.MINIGUN],
+                                weapons.WeaponID.SHOTGUN: weapons.weapon_max_ammo[weapons.WeaponID.SHOTGUN],
+                                weapons.WeaponID.RICOCHET: weapons.weapon_max_ammo[weapons.WeaponID.RICOCHET],
+                                weapons.WeaponID.CANNON: weapons.weapon_max_ammo[weapons.WeaponID.CANNON],
+                                weapons.WeaponID.FLAME: weapons.weapon_max_ammo[weapons.WeaponID.FLAME],
+                                weapons.WeaponID.ROCKET: weapons.weapon_max_ammo[weapons.WeaponID.ROCKET],
+                            }
+                            unlock_dict = {
+                                weapons.WeaponID.MINIGUN: True,
+                                weapons.WeaponID.SHOTGUN: False,
+                                weapons.WeaponID.RICOCHET: False,
+                                weapons.WeaponID.CANNON: False,
+                                weapons.WeaponID.FLAME: False,
+                                weapons.WeaponID.ROCKET: False,
+                            }
+                            # Scene variables.
+                            game_over = False
+                            next_level = False
+                    else:
+                        firing = True
                 elif event.button == 3:
-                    if player.heat > 0 and shield <= max_shield:
+                    if player.heat > 0 and shield <= max_shield and shield > 0:
                         player.heat -= 20
                         player.heat = max(0, player.heat)
                         shield -= 1
@@ -233,6 +360,8 @@ def main():
         # Move player and do collisions.
         moving_vertical = w ^ s
         moving_horizontal = a ^ d
+        if next_level or game_over:
+            moving_horizontal = moving_vertical = False
         amount = mobs.mob_speed[player.id] * dt * (0.707 if moving_horizontal and moving_vertical else 1)
         if moving_vertical:
             if w:
@@ -289,7 +418,7 @@ def main():
                         b = weapons.Bullet(player.rect.center, pg.mouse.get_pos() - SCREEN_CENTER, player.weapon, True)
                         player_bullets.add(b)
 
-        # Update all the mobs.
+        # Update all the mobs and bullets.
         mob_objects.add(player)
         los_lines = []
         for m in mob_objects:
@@ -320,7 +449,7 @@ def main():
                     else:
                         p.lifetime = 0
                 elif p.id is effects.ParticleID.SPEED:
-                    mobs.mob_speed[mobs.MobID.PLAYER] += 5
+                    mobs.mob_speed[mobs.MobID.PLAYER] += 2
                 elif p.id is effects.ParticleID.COOLING:
                     if shield < max_shield:
                         shield += 1
@@ -328,6 +457,7 @@ def main():
                         p.lifetime = 0
                 elif p.id is effects.ParticleID.MAX_HEAT:
                     player.max_heat += 5
+                    p_m_heat += 5
                 elif p.id is effects.ParticleID.WEAPON_GAIN:
                     if unlock_dict[p.weapon_id]:
                         ammo_dict[p.weapon_id] = weapons.weapon_max_ammo[p.weapon_id]
@@ -335,11 +465,25 @@ def main():
                         unlock_dict[p.weapon_id] = True
             p.update(dt)
 
+        # Detect coolers.
+        cooler_count = count_coolers(tile_objects)
+        if cooler_count == 0:
+            next_level = True
+            firing = False
+
         # Reduce player heat.
-        decay = (PLAYER_HEAT_DECAY - (PLAYER_FIRE_HEAT_DECAY_PENALTY if firing else 0)
-                 - (PLAYER_MOVE_HEAT_DECAY_PENALTY if moving_horizontal or moving_vertical else 0))
-        player.heat -= decay * dt
-        player.heat = max(0, player.heat)
+        if not next_level:
+            decay = (PLAYER_HEAT_DECAY - (PLAYER_FIRE_HEAT_DECAY_PENALTY if firing else 0)
+                     - (PLAYER_MOVE_HEAT_DECAY_PENALTY if moving_horizontal or moving_vertical else 0))
+            player.heat -= decay * dt
+            player.heat = max(0, player.heat)
+        if game_over:
+            player.heat = 100
+
+        # Detect game over.
+        if player.heat > player.max_heat:
+            game_over = True
+            firing = False
 
         # Draw stuff.
         screen.fill(BLACK)
@@ -395,10 +539,27 @@ def main():
                     p_text = font12.render(text, True, color)
                     screen.blit(p_text, camera_shift + p.pos - (p_text.get_width() // 2, p_text.get_height() // 2))
 
+        # Mouse over text.
+        if not firing:
+            for mob in mob_objects:
+                if mob.rect.move(camera_shift).collidepoint(pg.mouse.get_pos()):
+                    help_text = font12.render(" " + mobs.mob_names[mob.id], True, BLACK, WHITE)
+                    screen.blit(help_text, camera_shift + mob.rect.midtop - (help_text.get_width() // 2, 15))
+                    break
+            for tile in tile_objects:
+                if tile.rect.move(camera_shift).collidepoint(pg.mouse.get_pos()):
+                    help_text = font12.render(" " + tiles.tile_names[tile.id], True, BLACK, WHITE)
+                    screen.blit(help_text, camera_shift + tile.rect.midtop - (help_text.get_width() // 2, 15))
+                    break
+
         # Draw debug lines.
         if debug:
             for p in los_lines:
                 pg.draw.line(screen, RED, camera_shift + p, camera_shift + player.rect.center)
+
+        # Draw over heating warning.
+        if player.heat / player.max_heat > 0.75:
+            screen.blit(overheating_surf, (0, 0))
 
         # Draw UI.
 
@@ -417,6 +578,8 @@ def main():
             num_surf = font12.render(f" {i + 1}{" " if i == 0 else ""}", True, BLACK, color)
             screen.blit(num_surf, ((SCREEN_CENTER[0] - (weapon_text_surf.get_width() // 2)) + (i * 13),
                                    weapon_text_surf.get_height() + 4))
+        wheel_text_surf = font12.render(" SCROLL TO SWAP", True, BLACK, MED_GRAY)
+        screen.blit(wheel_text_surf, (SCREEN_CENTER[0], weapon_text_surf.get_height() + 4))
 
         # Draw shield meter.
         shield_pct = shield / max_shield
@@ -424,7 +587,7 @@ def main():
         shield_text_surf = font24.render(f"COOL: {shield}/{max_shield}", True, BLACK)
         screen.blit(shield_text_surf, (15, 47))
         hint_text = font12.render("E OR RIGHT CLICK TO COOL", True, CYAN)
-        screen.blit(hint_text, (25, 75))
+        screen.blit(hint_text, (25, 77))
 
         # Draw ammo meter.
         ammo_pct = ammo_dict[player.weapon] / weapons.weapon_max_ammo[player.weapon]
@@ -435,6 +598,21 @@ def main():
             text = f"AMMO: {ammo_dict[player.weapon]}/{weapons.weapon_max_ammo[player.weapon]}"
         ammo_text_surf = font24.render(text, True, BLACK)
         screen.blit(ammo_text_surf, (SCREEN_SIZE[0] - 230, 7))
+        cooler_text = font12.render(f"LEVEL {current_level} - {cooler_count} COOLERS REMAIN", True, CYAN)
+        screen.blit(cooler_text, (SCREEN_SIZE[0] - cooler_text.get_width() - 5, 38))
+        cooler_text = font12.render(f"SPEED: {mobs.mob_speed[player.id]}", True, YELLOW)
+        screen.blit(cooler_text, (SCREEN_SIZE[0] - cooler_text.get_width() - 5, 50))
+
+        # Draw the next level screen.
+        if next_level:
+            screen.blit(next_level_text.img, next_level_text.rect)
+            screen.blit(next_level_button.img, next_level_button.rect)
+            screen.blit(quit_button.img, quit_button.rect)
+        # Draw the game over screen.
+        elif game_over:
+            screen.blit(game_over_text.img, game_over_text.rect)
+            screen.blit(restart_button.img, restart_button.rect)
+            screen.blit(quit_button.img, quit_button.rect)
 
         # Draw targeting reticule.
         mpos = pg.mouse.get_pos()
